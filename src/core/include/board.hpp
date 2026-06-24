@@ -1,7 +1,83 @@
 #pragma once
 
-// Board state: 8x8 mailbox, make/unmake moves, Zobrist hash, attack detection.
+#include "types.hpp"
+
+#include <array>
+#include <cstdint>
+#include <optional>
+#include <ostream>
+#include <utility>
 
 namespace chesspp::core {
 
-}  // namespace chesspp::core
+struct CastlingRights {
+  bool white_kingside{false};
+  bool white_queenside{false};
+  bool black_kingside{false};
+  bool black_queenside{false};
+};
+
+// Save the state needed to reverse a move
+struct UndoState {
+  Move move{};
+  PieceType captured_piece{PieceType::None};
+  CastlingRights castling_rights{};
+  Square en_passant_square{NO_SQUARE};
+  std::uint16_t halfmove_clock{0};
+  HashKey zobrist_key{0};
+};
+
+class Board {
+public:
+  Board();
+
+  [[nodiscard]] static Board starting_position();
+  [[nodiscard]] static Board from_fen(const char *fen);
+
+  [[nodiscard]] const PieceBitboards &pieces() const noexcept;
+  [[nodiscard]] Bitboard pieces(Color color, PieceType piece) const noexcept;
+  [[nodiscard]] Bitboard occupancy(Color color) const noexcept;
+  [[nodiscard]] Bitboard all_occupancy() const noexcept;
+
+  [[nodiscard]] Color side_to_move() const noexcept;
+  [[nodiscard]] CastlingRights castling_rights() const noexcept;
+  [[nodiscard]] Square en_passant_square() const noexcept;
+  [[nodiscard]] std::uint16_t halfmove_clock() const noexcept;
+  [[nodiscard]] std::uint16_t fullmove_number() const noexcept;
+  [[nodiscard]] HashKey zobrist_key() const noexcept;
+
+  [[nodiscard]] std::optional<PieceType> piece_on(Square square) const noexcept;
+  [[nodiscard]] std::optional<Color> color_on(Square square) const noexcept;
+  [[nodiscard]] std::optional<std::pair<Color, PieceType>>
+  piece_and_color_on(Square square) const noexcept;
+
+  [[nodiscard]] Square king_square(Color color) const noexcept;
+  [[nodiscard]] bool in_check(Color color) const noexcept;
+  [[nodiscard]] Bitboard attackers_to(Square square,
+                                      Color by_color) const noexcept;
+
+  void clear() noexcept;
+  void set_piece(Square square, Color color, PieceType piece) noexcept;
+  void remove_piece(Square square, Color color, PieceType piece) noexcept;
+  void make_move(Move move, UndoState &undo) noexcept;
+  void unmake_move(const UndoState &undo) noexcept;
+
+  // Used for loading FEN/tests/debugging
+  void recompute_derived_state() noexcept;
+
+private:
+  PieceBitboards pieces_{};
+  std::array<Bitboard, COLOR_COUNT> occupancy_by_color_{};
+  Bitboard all_occupancy_{0};
+  Color side_to_move_{Color::White};
+  CastlingRights castling_rights_{};
+  Square en_passant_square_{NO_SQUARE};
+  std::uint16_t halfmove_clock_{0};
+  std::uint16_t fullmove_number_{1};
+  HashKey zobrist_key_{0};
+};
+
+// verbose flag for extra debug information
+void log_board(const Board &board, std::ostream &out, bool verbose = false);
+
+} // namespace chesspp::core
