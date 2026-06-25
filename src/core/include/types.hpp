@@ -8,9 +8,6 @@
 
 namespace chesspp::core {
 
-// Keep core types tiny and trivially copyable. These objects are passed around
-// in move generation/search millions of times, so avoid strings, heap
-// allocations, virtual functions, and SFML/UI dependencies here.
 using Bitboard = std::uint64_t;
 using HashKey = std::uint64_t;
 using Square = std::uint8_t;
@@ -126,6 +123,15 @@ enum class MoveFlag : std::uint16_t {
 
 [[nodiscard]] constexpr Color opposite(Color color) {
   return color == Color::White ? Color::Black : Color::White;
+}
+
+[[nodiscard]] constexpr Square square_from(int file, int rank) {
+  return static_cast<Square>((rank * 8) + file);
+}
+
+[[nodiscard]] constexpr Square square_from_algebraic(char file, char rank) {
+  return square_from(static_cast<int>(file - 'a'),
+                     static_cast<int>(rank - '1'));
 }
 
 [[nodiscard]] constexpr MoveFlag operator|(MoveFlag lhs, MoveFlag rhs) {

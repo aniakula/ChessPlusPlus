@@ -4,10 +4,12 @@
 #include <array>
 #include <bit>
 #include <cstdint>
+#include <exception>
 #include <iomanip>
 #include <ostream>
 #include <random>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace {
@@ -62,7 +64,7 @@ ZobristKeys make_zobrist_keys() {
   return keys;
 }
 
-const ZobristKeys &zobrist_keys() {
+const ZobristKeys &zobrist_hashes() {
   static const ZobristKeys keys = make_zobrist_keys();
   return keys;
 }
@@ -163,6 +165,41 @@ void write_bitboard(std::ostream &out, chesspp::core::Bitboard bitboard) {
   out.flags(flags);
   out.fill(fill);
 }
+void update_castling_rights(chesspp::core::CastlingRights &rights,
+                            const chesspp::core::PieceType &moved,
+                            const chesspp::core::MoveFlag &flags,
+                            const chesspp::core::Color &us,
+                            const chesspp::core::Square &from,
+                            const chesspp::core::Square &to) {
+  if (chesspp::core::has_flag(flags, chesspp::core::MoveFlag::KingCastle) ||
+      chesspp::core::has_flag(flags, chesspp::core::MoveFlag::QueenCastle) ||
+      moved == chesspp::core::PieceType::King) {
+    chesspp::core::Board::disable_castling_rights(us, rights);
+  } else if (moved == chesspp::core::PieceType::Rook &&
+             (from == 0 || from == 56)) {
+    chesspp::core::Board::disable_queen_side_castling_rights(us, rights);
+  } else if (moved == chesspp::core::PieceType::Rook &&
+             (from == 7 || from == 63)) {
+    chesspp::core::Board::disable_king_side_castling_rights(us, rights);
+  }
+
+  if (to == 0) {
+    chesspp::core::Board::disable_queen_side_castling_rights(
+        chesspp::core::Color::White, rights);
+    return;
+  } else if (to == 56) {
+    chesspp::core::Board::disable_queen_side_castling_rights(
+        chesspp::core::Color::Black, rights);
+    return;
+  } else if (to == 7) {
+    chesspp::core::Board::disable_king_side_castling_rights(
+        chesspp::core::Color::White, rights);
+    return;
+  } else if (to == 63) {
+    chesspp::core::Board::disable_king_side_castling_rights(
+        chesspp::core::Color::Black, rights);
+  }
+}
 
 } // namespace
 
@@ -185,7 +222,13 @@ Board Board::from_fen(const char *fen) {
       file = 0;
       continue;
     } else if (*token == ' ') {
-      // TODO: update with e.p. and castling rights parsing
+      token++;
+      try {
+        parse_fen_closer(token, board);
+      } catch (std::exception e) {
+        throw std::runtime_error("Error Loading FEN Trailing String");
+      }
+
       break;
     }
 
@@ -202,6 +245,61 @@ Board Board::from_fen(const char *fen) {
   }
 
   return board;
+}
+
+void Board::parse_fen_closer(const char *fen, Board &board) {
+  std::string closer(fen);
+  std::array<std::string, 5> parsed;
+  size_t start = 0;
+  size_t paramInd = 0;
+  for (size_t i = 0; i < closer.size(); i++) {
+    if (closer[i] == ' ') {
+      parsed[paramInd] = closer.substr(start, (i - start));
+      start = i + 1;
+      paramInd++;
+    }
+  }
+  parsed[paramInd] = closer.substr(start, closer.size() - start);
+
+  if (parsed[0] == "w") {
+    board.set_side_to_move(Color::White);
+  } else {
+    board.set_side_to_move(Color::Black);
+    board.hash(zobrist_hashes().side_to_move);
+  }
+
+  board.disable_castling_rights();
+  if (parsed[1] != "-") {
+    for (char castle : parsed[1]) {
+      switch (castle) {
+      case 'k':
+        board.set_castling_rights(Color::Black, PieceType::King, true);
+        break;
+      case 'K':
+        board.set_castling_rights(Color::White, PieceType::King, true);
+        break;
+      case 'q':
+        board.set_castling_rights(Color::Black, PieceType::Queen, true);
+        break;
+      case 'Q':
+        board.set_castling_rights(Color::White, PieceType::Queen, true);
+        break;
+      }
+    }
+  }
+  size_t castling_hash_index = castling_index(board.castling_rights());
+  board.hash(zobrist_hashes().castling[castling_hash_index]);
+
+  if (parsed[2] != "-") {
+    board.set_ep_square(square_from_algebraic(parsed[2][0], parsed[2][1]));
+    size_t ep_hash_index = square_to_file(board.en_passant_square());
+    board.hash(zobrist_hashes().en_passant_file[ep_hash_index]);
+  } else {
+    board.set_ep_square(NO_SQUARE);
+  }
+
+  board.set_half_moves(static_cast<uint16_t>(stoi(parsed[3])));
+  board.set_full_moves(static_cast<uint16_t>(stoi(parsed[4])));
 }
 
 const PieceBitboards &Board::pieces() const noexcept { return pieces_; }
@@ -286,6 +384,80 @@ Bitboard Board::attackers_to(Square square, Color by_color) const noexcept {
   return 0;
 }
 
+// setters:
+
+void Board::set_side_to_move(Color color) { side_to_move_ = color; }
+
+void Board::set_castling_rights(Color color, PieceType side, bool set) {
+  if (color == Color::Black) {
+    if (side == PieceType::Queen) {
+      castling_rights_.black_queenside = set;
+    } else {
+      castling_rights_.black_kingside = set;
+    }
+  } else {
+    if (side == PieceType::Queen) {
+      castling_rights_.white_queenside = set;
+    } else {
+      castling_rights_.white_kingside = set;
+    }
+  }
+}
+
+void Board::disable_castling_rights() {
+  set_castling_rights(Color::Black, PieceType::King, false);
+  set_castling_rights(Color::White, PieceType::King, false);
+  set_castling_rights(Color::Black, PieceType::Queen, false);
+  set_castling_rights(Color::White, PieceType::Queen, false);
+}
+
+void Board::disable_castling_rights(const Color &color) {
+  if (color == Color::White) {
+    set_castling_rights(Color::White, PieceType::King, false);
+    set_castling_rights(Color::White, PieceType::Queen, false);
+  } else {
+    set_castling_rights(Color::Black, PieceType::King, false);
+    set_castling_rights(Color::Black, PieceType::Queen, false);
+  }
+}
+
+void Board::disable_castling_rights(const Color &color,
+                                    CastlingRights &rights) {
+  if (color == Color::White) {
+    rights.white_queenside = false;
+    rights.white_kingside = false;
+  } else {
+    rights.black_queenside = false;
+    rights.black_kingside = false;
+  }
+}
+
+void Board::disable_queen_side_castling_rights(const Color &color,
+                                               CastlingRights &rights) {
+  if (color == Color::White) {
+    rights.white_queenside = false;
+  } else {
+    rights.black_queenside = false;
+  }
+}
+
+void Board::disable_king_side_castling_rights(const Color &color,
+                                              CastlingRights &rights) {
+  if (color == Color::White) {
+    rights.white_kingside = false;
+  } else {
+    rights.black_kingside = false;
+  }
+}
+
+void Board::set_ep_square(Square square) { en_passant_square_ = square; }
+
+void Board::set_full_moves(uint16_t moves) { fullmove_number_ = moves; }
+
+void Board::set_half_moves(uint16_t moves) { halfmove_clock_ = moves; }
+
+void Board::hash(HashKey key) { zobrist_key_ ^= key; }
+
 void Board::clear() noexcept {
   pieces_ = {};
   occupancy_by_color_ = {};
@@ -304,8 +476,9 @@ void Board::set_piece(Square square, Color color, PieceType piece) noexcept {
   occupancy_by_color_[color_index(color)] |= mask;
   all_occupancy_ |= mask;
 
-  zobrist_key_ ^= zobrist_keys().pieces[color_index(color)][piece_index(piece)]
-                                       [static_cast<std::size_t>(square)];
+  zobrist_key_ ^=
+      zobrist_hashes().pieces[color_index(color)][piece_index(piece)]
+                             [static_cast<std::size_t>(square)];
 }
 
 void Board::remove_piece(Square square, Color color, PieceType piece) noexcept {
@@ -314,30 +487,118 @@ void Board::remove_piece(Square square, Color color, PieceType piece) noexcept {
   occupancy_by_color_[color_index(color)] &= mask;
   all_occupancy_ &= mask;
 
-  zobrist_key_ ^= zobrist_keys().pieces[color_index(color)][piece_index(piece)]
-                                       [static_cast<std::size_t>(square)];
+  zobrist_key_ ^=
+      zobrist_hashes().pieces[color_index(color)][piece_index(piece)]
+                             [static_cast<std::size_t>(square)];
 }
 
 void Board::make_move(Move move, UndoState &undo) noexcept {
-  // TODO: Save undo, mutate bitboards/clocks/castling/en-passant/hash.
-  // Hash update checklist for real implementation:
-  // 1. undo.zobrist_key = zobrist_key_ before changing anything.
-  // 2. XOR moving piece off the from-square and on the to-square.
-  // 3. If capture, XOR captured piece off its captured square.
-  // 4. XOR old castling state off, update rights, XOR new castling state on.
-  // 5. XOR old en-passant file off, update square, XOR new file on.
-  // 6. XOR zobrist_keys().side_to_move once when side_to_move_ flips.
+  const Square from = move.from();
+  const Square to = move.to();
+  const MoveFlag flags = move.flags();
+  const Color us = side_to_move_;
+  const Color them = opposite(us);
 
-  (void)move;
-  (void)undo;
+  undo.move = move;
+  undo.zobrist_key = zobrist_key_;
+  undo.castling_rights = castling_rights_;
+  undo.en_passant_square = en_passant_square_;
+  undo.halfmove_clock = halfmove_clock_;
+  undo.fullmove_number = fullmove_number_;
+  undo.captured_piece = PieceType::None;
+  undo.captured_square = NO_SQUARE;
+
+  const PieceType moving = piece_on(from).value_or(PieceType::None);
+  undo.moved_piece = moving;
+
+  if (has_flag(flags, MoveFlag::EnPassant)) {
+    undo.captured_square =
+        static_cast<Square>(us == Color::White ? to - 8 : to + 8);
+    undo.captured_piece = PieceType::Pawn;
+    remove_piece(undo.captured_square, them, PieceType::Pawn);
+  } else if (has_flag(flags, MoveFlag::Capture)) {
+    undo.captured_square = to;
+    undo.captured_piece = piece_on(to).value_or(PieceType::None);
+    remove_piece(to, them, undo.captured_piece);
+  }
+
+  remove_piece(from, us, moving);
+  const PieceType placed =
+      has_flag(flags, MoveFlag::Promotion) ? move.promotion() : moving;
+  set_piece(to, us, placed);
+
+  if (has_flag(flags, MoveFlag::KingCastle)) {
+    remove_piece(to + 1, us, PieceType::Rook);
+    set_piece(to - 1, us, PieceType::Rook);
+  } else if (has_flag(flags, MoveFlag::QueenCastle)) {
+    remove_piece(to - 2, us, PieceType::Rook);
+    set_piece(to + 1, us, PieceType::Rook);
+  }
+
+  const auto &keys = zobrist_hashes();
+  zobrist_key_ ^= keys.castling[castling_index(castling_rights_)];
+  update_castling_rights(castling_rights_, placed, flags, us, from, to);
+  zobrist_key_ ^= keys.castling[castling_index(castling_rights_)];
+
+  if (en_passant_square_ != NO_SQUARE) {
+    zobrist_key_ ^= keys.en_passant_file[square_to_file(en_passant_square_)];
+  }
+
+  en_passant_square_ = NO_SQUARE;
+  if (has_flag(flags, MoveFlag::DoublePawnPush)) {
+    en_passant_square_ =
+        static_cast<Square>(us == Color::White ? to - 8 : to + 8);
+    zobrist_key_ ^= keys.en_passant_file[square_to_file(en_passant_square_)];
+  }
+
+  if (moving == PieceType::Pawn || has_flag(flags, MoveFlag::Capture)) {
+    halfmove_clock_ = 0;
+  } else {
+    ++halfmove_clock_;
+  }
+
+  if (us == Color::Black) {
+    ++fullmove_number_;
+  }
+
+  zobrist_key_ ^= keys.side_to_move;
+  side_to_move_ = them;
 }
 
 void Board::unmake_move(const UndoState &undo) noexcept {
-  // TODO: Restore board from undo and reverse bitboard changes.
-  // The simplest and safest hash strategy is to restore:
-  // zobrist_key_ = undo.zobrist_key;
-  // Then restore pieces/occupancies/clocks/rights to match that position.
-  (void)undo;
+  const Move move = undo.move;
+  const Square from = move.from();
+  const Square to = move.to();
+  const MoveFlag flags = move.flags();
+  const Color us = opposite(side_to_move_);
+
+  // set rook position based on king's landing spot:
+  if (has_flag(flags, MoveFlag::KingCastle)) {
+    remove_piece(to - 1, us, PieceType::Rook);
+    set_piece(to + 1, us, PieceType::Rook);
+  } else if (has_flag(flags, MoveFlag::QueenCastle)) {
+    remove_piece(to + 1, us, PieceType::Rook);
+    set_piece(to - 2, us, PieceType::Rook);
+  }
+
+  const PieceType placed = has_flag(flags, MoveFlag::Promotion)
+                               ? move.promotion()
+                               : undo.moved_piece;
+  // set moved piece to original location:
+  remove_piece(to, us, placed);
+  set_piece(from, us, undo.moved_piece);
+
+  // reset captured piece:
+  if (undo.captured_piece != PieceType::None) {
+    set_piece(undo.captured_square, opposite(us), undo.captured_piece);
+  }
+
+  side_to_move_ = us;
+  castling_rights_ = undo.castling_rights;
+  en_passant_square_ = undo.en_passant_square;
+  halfmove_clock_ = undo.halfmove_clock;
+  fullmove_number_ = undo.fullmove_number;
+  zobrist_key_ = undo.zobrist_key;
 }
 
 void Board::recompute_derived_state() noexcept {
@@ -345,7 +606,7 @@ void Board::recompute_derived_state() noexcept {
   all_occupancy_ = 0;
   zobrist_key_ = 0;
 
-  const auto &keys = zobrist_keys();
+  const auto &keys = zobrist_hashes();
 
   for (std::size_t color = 0; color < COLOR_COUNT; ++color) {
     for (std::size_t piece = 0; piece < PIECE_TYPE_COUNT; ++piece) {

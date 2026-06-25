@@ -12,6 +12,7 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(board_tests
     board_test.cpp
+    pgn_test.cpp
 )
 
 target_link_libraries(board_tests

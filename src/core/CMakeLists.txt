@@ -1,8 +1,8 @@
 add_library(chesspp_core STATIC
-    src/types.cpp
     src/board.cpp
     src/movegen.cpp
     src/game.cpp
+    src/pgn.cpp
 )
 
 target_include_directories(chesspp_core

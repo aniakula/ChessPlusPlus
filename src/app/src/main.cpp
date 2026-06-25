@@ -1,1 +1,2 @@
-int main() { return 0; }
+#include "game_loop.hpp"
+int main() { chesspp::app::startGame(); }
