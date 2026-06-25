@@ -19,7 +19,7 @@ inline constexpr int COLOR_COUNT = 2;
 inline constexpr int PIECE_TYPE_COUNT = 6;
 inline constexpr Score MATE_SCORE = 32000;
 inline constexpr Score INF = std::numeric_limits<Score>::max() / 2;
-inline constexpr char *STARTING_POSITION_FEN =
+inline constexpr const char *STARTING_POSITION_FEN =
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 enum class Color : std::uint8_t {
