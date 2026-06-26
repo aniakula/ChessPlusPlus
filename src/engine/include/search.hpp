@@ -34,8 +34,8 @@ public:
   void clear() noexcept;
 
   [[nodiscard]] bool probe(chesspp::core::HashKey key,
-                           TranspositionEntry& out) const noexcept;
-  void store(const TranspositionEntry& entry) noexcept;
+                           TranspositionEntry &out) const noexcept;
+  void store(const TranspositionEntry &entry) noexcept;
 
 private:
   // The transposition table is the engine's position cache.
@@ -92,20 +92,20 @@ public:
   // Fast move ordering is often more important than raw move generation speed
   // for alpha-beta. Start with captures/promotions, then add TT move, killers,
   // history heuristic, MVV-LVA, etc.
-  void score_moves(const chesspp::core::Board& board,
-                   chesspp::core::MoveList& moves,
+  void score_moves(const chesspp::core::Board &board,
+                   chesspp::core::MoveList &moves,
                    chesspp::core::Move transposition_move =
                        chesspp::core::Move::null()) noexcept;
 };
 
 class Search {
 public:
-  explicit Search(Evaluator evaluator = Evaluator{},
-                  TranspositionTable transposition_table =
-                      TranspositionTable{});
+  explicit Search(
+      Evaluator evaluator = Evaluator{},
+      TranspositionTable transposition_table = TranspositionTable{});
 
-  [[nodiscard]] SearchResult search(chesspp::core::Board& board,
-                                    const SearchLimits& limits);
+  [[nodiscard]] SearchResult search(chesspp::core::Board &board,
+                                    const SearchLimits &limits);
 
   void clear_cache() noexcept;
   void resize_cache(std::size_t megabytes);
@@ -117,17 +117,17 @@ private:
   SearchStats stats_{};
 
   [[nodiscard]] chesspp::core::Score
-  alpha_beta(chesspp::core::Board& board, int depth,
-             chesspp::core::Score alpha, chesspp::core::Score beta,
-             int ply);
-
-  [[nodiscard]] chesspp::core::Score
-  quiescence(chesspp::core::Board& board, chesspp::core::Score alpha,
+  alpha_beta(chesspp::core::Board &board, int depth, chesspp::core::Score alpha,
              chesspp::core::Score beta, int ply);
 
-  [[nodiscard]] bool should_stop(const SearchLimits& limits) const noexcept;
-  [[nodiscard]] chesspp::core::Score terminal_score(
-      const chesspp::core::Board& board, int ply) const noexcept;
+  [[nodiscard]] chesspp::core::Score quiescence(chesspp::core::Board &board,
+                                                chesspp::core::Score alpha,
+                                                chesspp::core::Score beta,
+                                                int ply);
+
+  [[nodiscard]] bool should_stop(const SearchLimits &limits) const noexcept;
+  [[nodiscard]] chesspp::core::Score
+  terminal_score(const chesspp::core::Board &board, int ply) const noexcept;
 };
 
-}  // namespace chesspp::engine
+} // namespace chesspp::engine

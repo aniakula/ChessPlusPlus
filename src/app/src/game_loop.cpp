@@ -1,7 +1,9 @@
 #include "game_loop.hpp"
+#include "SFML/Graphics/Image.hpp"
 #include "SFML/Window/Event.hpp"
 #include "logging.hpp"
 #include "search.hpp"
+#include <filesystem>
 #include <optional>
 #include <stdexcept>
 
@@ -9,6 +11,11 @@ namespace chesspp::app {
 
 GameLoop::GameLoop()
     : window_{sf::VideoMode({800U, 800U}), "Chess++"}, renderer_{window_} {
+  sf::Image icon;
+  if (icon.loadFromFile(std::filesystem::path{"src/assets/ChessPPIcon.png"})) {
+    window_.setIcon(icon.getSize(), icon.getPixelsPtr());
+  }
+
   (void)renderer_.load_assets("src/assets");
 }
 
