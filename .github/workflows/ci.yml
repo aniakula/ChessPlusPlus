@@ -52,4 +52,22 @@ jobs:
         run: cmake --build build --config ${{ matrix.build-type }}
 
       - name: Run tests
+        if: runner.os != 'Windows'
         run: ctest --test-dir build --build-config ${{ matrix.build-type }} --output-on-failure
+
+      - name: Run tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $buildDir = Join-Path $PWD "build"
+          $config = "${{ matrix.build-type }}"
+          $paths = @(
+            (Join-Path $buildDir "bin\$config"),
+            (Join-Path $buildDir "lib\$config"),
+            (Join-Path $buildDir "_deps\googletest-build\bin\$config"),
+            (Join-Path $buildDir "_deps\googletest-build\lib\$config"),
+            (Join-Path $buildDir "_deps\sfml-build\bin\$config"),
+            (Join-Path $buildDir "_deps\sfml-build\lib\$config")
+          )
+          $env:PATH = ($paths -join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $env:PATH
+          ctest --test-dir build --build-config $config --output-on-failure

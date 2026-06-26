@@ -24,14 +24,10 @@ private:
   InputHandler input_{};
   chesspp::core::Color human_color_{chesspp::core::Color::White};
 
-  void handle_event(const sf::Event& event);
-  void handle_human_action(const InputAction& action);
+  void handle_action(const InputAction &action);
   void play_engine_turn();
   [[nodiscard]] bool is_human_turn() const noexcept;
   [[nodiscard]] bool game_over() const;
 };
-
-// Thin app entry point used by main.cpp.
-void startGame();
 
 } // namespace chesspp::app

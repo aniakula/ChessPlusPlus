@@ -1,31 +1,71 @@
 #include "game_loop.hpp"
+#include "SFML/Window/Event.hpp"
+#include "logging.hpp"
+#include "search.hpp"
+#include <optional>
+#include <stdexcept>
 
 namespace chesspp::app {
 
 GameLoop::GameLoop()
-    : window_{sf::VideoMode(800, 800), "Chess++"}, renderer_{window_} {}
+    : window_{sf::VideoMode({800U, 800U}), "Chess++"}, renderer_{window_} {
+  (void)renderer_.load_assets("src/assets");
+}
 
 void GameLoop::run() {
-  // TODO: Main SFML loop:
-  // 1. poll events
-  // 2. pass events to InputHandler
-  // 3. apply human move through core::Game
-  // 4. ask Engine for a move when it is engine's turn
-  // 5. render current state
+  while (window_.isOpen()) {
+    while (const std::optional<sf::Event> event = window_.pollEvent()) {
+      if ((*event).is<sf::Event::Closed>()) {
+        window_.close();
+        break;
+      }
+      const InputAction action = input_.transform_event(*event, game_);
+      handle_action(action);
+    }
+
+    if (!game_over() && !is_human_turn()) {
+      play_engine_turn();
+    }
+
+    renderer_.draw(game_, input_.selected_square(), {});
+  }
 }
 
-void GameLoop::handle_event(const sf::Event& event) {
-  // TODO: Close window or convert event to InputAction.
-  (void)event;
-}
-
-void GameLoop::handle_human_action(const InputAction& action) {
-  // TODO: Validate/apply moves through game_.try_make_move().
-  (void)action;
+void GameLoop::handle_action(const InputAction &action) {
+  switch (action.type) {
+  case InputAction::Type::None:
+    break;
+  case InputAction::Type::SelectSquare:
+  case InputAction::Type::RequestPromotion:
+    break;
+  case InputAction::Type::Quit:
+    window_.close();
+    break;
+  case InputAction::Type::PlayMove:
+    if (game_.try_make_move(action.move)) {
+      input_.clear_selection();
+    }
+    break;
+  }
 }
 
 void GameLoop::play_engine_turn() {
-  // TODO: Call engine_.set_position(game_.board()), engine_.think(), then apply.
+  engine_.set_position(game_.board());
+  const chesspp::engine::SearchResult &result = engine_.think();
+
+  LABELED_DEBUG_LOG("Best Move: ", result.best_move);
+  LABELED_DEBUG_LOG("Score: ", result.score);
+  LABELED_DEBUG_LOG("Max Depth Reached: ", result.depth_reached);
+  LABELED_DEBUG_LOG("Search Stats: ", result.stats);
+
+  if (!result.best_move.is_null()) {
+    const bool move_applied = game_.try_make_move(result.best_move);
+    if (!move_applied) {
+      throw std::runtime_error("Error attempting to make engine move");
+    }
+  } else {
+    throw std::runtime_error("Error null best move from engine");
+  }
 }
 
 bool GameLoop::is_human_turn() const noexcept {
@@ -34,11 +74,6 @@ bool GameLoop::is_human_turn() const noexcept {
 
 bool GameLoop::game_over() const {
   return game_.result() != chesspp::core::GameResult::Ongoing;
-}
-
-void startGame() {
-  GameLoop loop;
-  loop.run();
 }
 
 } // namespace chesspp::app

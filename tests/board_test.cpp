@@ -281,6 +281,14 @@ TEST(BoardTest, StartingPositionMatchesExpectedPiecePlacement) {
   SCOPED_TRACE(log_board_to_string(board));
 }
 
+TEST(BoardTest, MoveStreamOutputIsHumanReadable) {
+  std::ostringstream out;
+  out << Move(square_from_algebraic('e', '7'), square_from_algebraic('e', '8'),
+              PieceType::Queen, MoveFlag::Promotion | MoveFlag::Capture);
+
+  EXPECT_EQ(out.str(), "e7e8=Q (capture, promotion)");
+}
+
 TEST(BoardTest, FromFenParsesTrailingStateFields) {
   const Board board = board_from_fen(
       "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");

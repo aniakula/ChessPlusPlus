@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <ostream>
 #include <utility>
 
 namespace chesspp::core {
@@ -180,6 +181,68 @@ public:
 private:
   std::uint32_t data_{0};
 };
+
+inline std::ostream &operator<<(std::ostream &out, Move move) {
+  const auto write_square = [&out](Square square) {
+    if (square == NO_SQUARE) {
+      out << "-";
+      return;
+    }
+
+    out << static_cast<char>('a' + (square % 8))
+        << static_cast<char>('1' + (square / 8));
+  };
+
+  if (move.is_null()) {
+    out << "<null move>";
+    return out;
+  }
+
+  write_square(move.from());
+  write_square(move.to());
+
+  if (move.promotion() != PieceType::None) {
+    switch (move.promotion()) {
+    case PieceType::Knight:
+      out << "=N";
+      break;
+    case PieceType::Bishop:
+      out << "=B";
+      break;
+    case PieceType::Rook:
+      out << "=R";
+      break;
+    case PieceType::Queen:
+      out << "=Q";
+      break;
+    default:
+      break;
+    }
+  }
+
+  const MoveFlag flags = move.flags();
+  if (flags == MoveFlag::Quiet) {
+    return out;
+  }
+
+  const char *separator = " (";
+  const auto write_flag = [&](MoveFlag flag, const char *name) {
+    if (has_flag(flags, flag)) {
+      out << separator << name;
+      separator = ", ";
+    }
+  };
+
+  write_flag(MoveFlag::Capture, "capture");
+  write_flag(MoveFlag::DoublePawnPush, "double-pawn-push");
+  write_flag(MoveFlag::EnPassant, "en-passant");
+  write_flag(MoveFlag::KingCastle, "king-castle");
+  write_flag(MoveFlag::QueenCastle, "queen-castle");
+  write_flag(MoveFlag::Promotion, "promotion");
+
+  out << ')';
+  return out;
+}
 
 struct ScoredMove {
   Move move{};

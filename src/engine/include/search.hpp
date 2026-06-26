@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <ostream>
 #include <vector>
 
 namespace chesspp::engine {
@@ -71,6 +72,13 @@ struct SearchStats {
   std::uint64_t transposition_hits{0};
   std::uint64_t beta_cutoffs{0};
 };
+
+inline std::ostream &operator<<(std::ostream &out, const SearchStats &stats) {
+  out << "SearchStats{nodes=" << stats.nodes
+      << ", transposition_hits=" << stats.transposition_hits
+      << ", beta_cutoffs=" << stats.beta_cutoffs << '}';
+  return out;
+}
 
 struct SearchResult {
   chesspp::core::Move best_move{};

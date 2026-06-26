@@ -1,2 +1,5 @@
 #include "game_loop.hpp"
-int main() { chesspp::app::startGame(); }
+int main() {
+  chesspp::app::GameLoop loop;
+  loop.run();
+}

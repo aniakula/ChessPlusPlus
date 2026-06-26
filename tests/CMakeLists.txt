@@ -13,10 +13,17 @@ FetchContent_MakeAvailable(googletest)
 add_executable(board_tests
     board_test.cpp
     pgn_test.cpp
+    search_test.cpp
+)
+
+target_include_directories(board_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src/engine/include
 )
 
 target_link_libraries(board_tests
     PRIVATE
+        chesspp_engine
         chesspp_core
         GTest::gtest_main
 )
@@ -24,4 +31,6 @@ target_link_libraries(board_tests
 chesspp_set_warnings(board_tests)
 
 include(GoogleTest)
-gtest_discover_tests(board_tests)
+gtest_discover_tests(board_tests
+    DISCOVERY_MODE PRE_TEST
+)
