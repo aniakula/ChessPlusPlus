@@ -40,38 +40,37 @@ enum class MoveGenerationType : std::uint8_t {
 
 namespace MoveGenerator {
 
-static void generate_pseudo_legal(
+void generate_pseudo_legal(
     const Board &board, MoveList &moves,
     MoveGenerationType type = MoveGenerationType::All) noexcept;
-static void generate_legal(Board &board, MoveList &moves) noexcept;
+void generate_legal(Board &board, MoveList &moves) noexcept;
 
 // Attack helpers are critical for fast legality checks, check detection, and
 // future quiescence/search extensions.
-[[nodiscard]] static Bitboard pawn_attacks(Color color, Square square) noexcept;
-[[nodiscard]] static Bitboard knight_attacks(Square square) noexcept;
-[[nodiscard]] static Bitboard bishop_attacks(Square square,
-                                             Bitboard occupancy) noexcept;
-[[nodiscard]] static Bitboard rook_attacks(Square square,
-                                           Bitboard occupancy) noexcept;
-[[nodiscard]] static Bitboard queen_attacks(Square square,
-                                            Bitboard occupancy) noexcept;
-[[nodiscard]] static Bitboard king_attacks(Square square) noexcept;
+[[nodiscard]] Bitboard pawn_attacks(Color color, Square square) noexcept;
+[[nodiscard]] Bitboard knight_attacks(Square square) noexcept;
+[[nodiscard]] Bitboard bishop_attacks(Square square,
+                                      Bitboard occupancy) noexcept;
+[[nodiscard]] Bitboard rook_attacks(Square square, Bitboard occupancy) noexcept;
+[[nodiscard]] Bitboard queen_attacks(Square square,
+                                     Bitboard occupancy) noexcept;
+[[nodiscard]] Bitboard king_attacks(Square square) noexcept;
 
-static void generate_pawns(const Board &board, MoveList &moves,
-                           MoveGenerationType type) noexcept;
-static void generate_knights(const Board &board, MoveList &moves,
-                             MoveGenerationType type) noexcept;
-static void generate_bishops(const Board &board, MoveList &moves,
-                             MoveGenerationType type) noexcept;
-static void generate_rooks(const Board &board, MoveList &moves,
-                           MoveGenerationType type) noexcept;
-static void generate_queens(const Board &board, MoveList &moves,
-                            MoveGenerationType type) noexcept;
-static void generate_king(const Board &board, MoveList &moves,
-                          MoveGenerationType type) noexcept;
-[[nodiscard]] static bool leaves_king_safe(Board &board, Move move) noexcept;
+void generate_pawns(const Board &board, MoveList &moves,
+                    MoveGenerationType type) noexcept;
+void generate_knights(const Board &board, MoveList &moves,
+                      MoveGenerationType type) noexcept;
+void generate_bishops(const Board &board, MoveList &moves,
+                      MoveGenerationType type) noexcept;
+void generate_rooks(const Board &board, MoveList &moves,
+                    MoveGenerationType type) noexcept;
+void generate_queens(const Board &board, MoveList &moves,
+                     MoveGenerationType type) noexcept;
+void generate_king(const Board &board, MoveList &moves,
+                   MoveGenerationType type) noexcept;
+[[nodiscard]] bool leaves_king_safe(Board &board, Move move) noexcept;
 
-static constexpr std::array<std::array<int8_t, 2>, 8> knightDeltas = {{
+inline constexpr std::array<std::array<int8_t, 2>, 8> knightDeltas = {{
     {2, -1},
     {2, 1},
     {-2, -1},
@@ -82,7 +81,7 @@ static constexpr std::array<std::array<int8_t, 2>, 8> knightDeltas = {{
     {-1, 2},
 }};
 
-static constexpr std::array<std::array<int8_t, 2>, 8> kingDeltas = {{
+inline constexpr std::array<std::array<int8_t, 2>, 8> kingDeltas = {{
     {1, -1},
     {1, 1},
     {-1, 0},
@@ -93,7 +92,7 @@ static constexpr std::array<std::array<int8_t, 2>, 8> kingDeltas = {{
     {0, 1},
 }};
 
-static constexpr const std::array<Bitboard, 64> king_attack_table = []() {
+inline constexpr const std::array<Bitboard, 64> king_attack_table = []() {
   std::array<Bitboard, 64> attacks;
   for (int i = 0; i < 64; i++) {
     Bitboard currAttacks{0};
@@ -113,7 +112,7 @@ static constexpr const std::array<Bitboard, 64> king_attack_table = []() {
   return attacks;
 }();
 
-static constexpr const std::array<Bitboard, 64> knight_attack_table = []() {
+inline constexpr const std::array<Bitboard, 64> knight_attack_table = []() {
   std::array<Bitboard, 64> attacks;
   for (int i = 0; i < 64; i++) {
     Bitboard currAttacks{0};
