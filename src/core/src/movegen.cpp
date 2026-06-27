@@ -14,7 +14,7 @@ std::size_t MoveList::size() const noexcept { return size_; }
 
 bool MoveList::empty() const noexcept { return size_ == 0; }
 
-const Move& MoveList::operator[](std::size_t index) const noexcept {
+const Move &MoveList::operator[](std::size_t index) const noexcept {
   return moves_[index];
 }
 
@@ -26,7 +26,7 @@ MoveList::const_iterator MoveList::end() const noexcept {
   return moves_.begin() + static_cast<std::ptrdiff_t>(size_);
 }
 
-void MoveGenerator::generate_pseudo_legal(const Board& board, MoveList& moves,
+void MoveGenerator::generate_pseudo_legal(const Board &board, MoveList &moves,
                                           MoveGenerationType type) noexcept {
   // TODO: Dispatch piece-specific bitboard generators.
   (void)board;
@@ -34,8 +34,9 @@ void MoveGenerator::generate_pseudo_legal(const Board& board, MoveList& moves,
   (void)type;
 }
 
-void MoveGenerator::generate_legal(Board& board, MoveList& moves) noexcept {
-  // TODO: Generate pseudo-legal moves, then make/unmake and keep king-safe moves.
+void MoveGenerator::generate_legal(Board &board, MoveList &moves) noexcept {
+  // TODO: Generate pseudo-legal moves, then make/unmake and keep king-safe
+  // moves.
   (void)board;
   (void)moves;
 }
@@ -48,9 +49,7 @@ Bitboard MoveGenerator::pawn_attacks(Color color, Square square) noexcept {
 }
 
 Bitboard MoveGenerator::knight_attacks(Square square) noexcept {
-  // TODO: Prefer a precomputed 64-entry table.
-  (void)square;
-  return 0;
+  return knight_attack_table[square];
 }
 
 Bitboard MoveGenerator::bishop_attacks(Square square,
@@ -71,61 +70,56 @@ Bitboard MoveGenerator::rook_attacks(Square square,
 
 Bitboard MoveGenerator::queen_attacks(Square square,
                                       Bitboard occupancy) noexcept {
-  // TODO: bishop_attacks(square, occupancy) | rook_attacks(square, occupancy).
-  (void)square;
-  (void)occupancy;
-  return 0;
+  return bishop_attacks(square, occupancy) | rook_attacks(square, occupancy);
 }
 
 Bitboard MoveGenerator::king_attacks(Square square) noexcept {
-  // TODO: Prefer a precomputed 64-entry table.
-  (void)square;
-  return 0;
+  return king_attack_table[square];
 }
 
-void MoveGenerator::generate_pawns(const Board& board, MoveList& moves,
+void MoveGenerator::generate_pawns(const Board &board, MoveList &moves,
                                    MoveGenerationType type) noexcept {
   (void)board;
   (void)moves;
   (void)type;
 }
 
-void MoveGenerator::generate_knights(const Board& board, MoveList& moves,
+void MoveGenerator::generate_knights(const Board &board, MoveList &moves,
                                      MoveGenerationType type) noexcept {
   (void)board;
   (void)moves;
   (void)type;
 }
 
-void MoveGenerator::generate_bishops(const Board& board, MoveList& moves,
+void MoveGenerator::generate_bishops(const Board &board, MoveList &moves,
                                      MoveGenerationType type) noexcept {
   (void)board;
   (void)moves;
   (void)type;
 }
 
-void MoveGenerator::generate_rooks(const Board& board, MoveList& moves,
+void MoveGenerator::generate_rooks(const Board &board, MoveList &moves,
                                    MoveGenerationType type) noexcept {
   (void)board;
   (void)moves;
   (void)type;
 }
 
-void MoveGenerator::generate_queens(const Board& board, MoveList& moves,
+void MoveGenerator::generate_queens(const Board &board, MoveList &moves,
                                     MoveGenerationType type) noexcept {
   (void)board;
   (void)moves;
   (void)type;
 }
 
-void MoveGenerator::generate_king(const Board& board, MoveList& moves,
+void MoveGenerator::generate_king(const Board &board, MoveList &moves,
                                   MoveGenerationType type) noexcept {
   (void)board;
   (void)moves;
   (void)type;
 }
 
-bool MoveGenerator::leaves_king_safe(Board& board, Move move) noexcept {
+bool MoveGenerator::leaves_king_safe(Board &board, Move move) noexcept {
   // TODO: make_move, test in_check(previous side), unmake_move.
   (void)board;
   (void)move;
