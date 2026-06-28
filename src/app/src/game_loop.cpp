@@ -14,6 +14,7 @@ GameLoop::GameLoop()
   sf::Image icon;
   if (icon.loadFromFile(std::filesystem::path{"src/assets/ChessPPIcon.png"})) {
     window_.setIcon(icon.getSize(), icon.getPixelsPtr());
+    window_.setFramerateLimit(60);
   }
 
   (void)renderer_.load_assets("src/assets");

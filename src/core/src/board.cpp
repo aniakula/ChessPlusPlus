@@ -1,4 +1,5 @@
 #include "board.hpp"
+#include "movegen.hpp"
 #include "types.hpp"
 
 #include <array>
@@ -333,7 +334,6 @@ std::uint16_t Board::fullmove_number() const noexcept {
 HashKey Board::zobrist_key() const noexcept { return zobrist_key_; }
 
 std::optional<PieceType> Board::piece_on(Square square) const noexcept {
-  // TODO: Test the square bit against each piece bitboard.
   for (size_t piece = 0; piece < PIECE_TYPE_COUNT; piece++) {
     for (size_t color = 0; color < COLOR_COUNT; color++) {
       if (pieces_[color][piece] & square_mask(square)) {
@@ -374,14 +374,32 @@ Square Board::king_square(Color color) const noexcept {
 }
 
 bool Board::in_check(Color color) const noexcept {
-  return attackers_to(king_square(color), color);
+  return attackers_to(king_square(color), opposite(color)) != 0;
 }
 
 Bitboard Board::attackers_to(Square square, Color by_color) const noexcept {
-  // TODO: Combine pawn/knight/slider/king attacks against square.
-  (void)square;
-  (void)by_color;
-  return 0;
+  const Bitboard occ = all_occupancy_;
+  const Bitboard pawns =
+      pieces_[color_index(by_color)][piece_index(PieceType::Pawn)];
+  const Bitboard knights =
+      pieces_[color_index(by_color)][piece_index(PieceType::Knight)];
+  const Bitboard bishops =
+      pieces_[color_index(by_color)][piece_index(PieceType::Bishop)];
+  const Bitboard rooks =
+      pieces_[color_index(by_color)][piece_index(PieceType::Rook)];
+  const Bitboard queens =
+      pieces_[color_index(by_color)][piece_index(PieceType::Queen)];
+  const Bitboard king =
+      pieces_[color_index(by_color)][piece_index(PieceType::King)];
+  Bitboard attackers = 0;
+  //(pawns attacking a square can only be on the attacked squares of a pawn of
+  // opposite color)
+  attackers |= MoveGenerator::pawn_attacks(opposite(by_color), square) & pawns;
+  attackers |= MoveGenerator::knight_attacks(square) & knights;
+  attackers |= MoveGenerator::bishop_attacks(square, occ) & (bishops | queens);
+  attackers |= MoveGenerator::rook_attacks(square, occ) & (rooks | queens);
+  attackers |= MoveGenerator::king_attacks(square) & king;
+  return attackers;
 }
 
 // setters:
