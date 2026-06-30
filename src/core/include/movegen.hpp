@@ -26,6 +26,7 @@ public:
   [[nodiscard]] const_iterator begin() const noexcept;
   [[nodiscard]] const_iterator end() const noexcept;
   bool contains(const Move &move) const;
+  bool contains(const Square &square) const;
 
 private:
   Storage moves_{};

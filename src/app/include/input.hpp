@@ -1,11 +1,9 @@
 #pragma once
 
+#include "SFML/Window/Event.hpp"
 #include "game.hpp"
 #include "movegen.hpp"
 #include "types.hpp"
-
-#include "SFML/System/Vector2.hpp"
-#include "SFML/Window/Event.hpp"
 
 #include <optional>
 
@@ -45,8 +43,6 @@ private:
   std::optional<chesspp::core::Square> selected_square_{};
   chesspp::core::MoveList legal_moves_{};
 
-  [[nodiscard]] chesspp::core::Square
-  pixel_to_square(sf::Vector2i pixel) const noexcept;
   [[nodiscard]] std::optional<chesspp::core::Move>
   find_move_to_square(const chesspp::core::MoveList &legal_moves,
                       chesspp::core::Square to) const noexcept;

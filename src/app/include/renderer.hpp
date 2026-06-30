@@ -2,6 +2,7 @@
 
 #include "board.hpp"
 #include "game.hpp"
+#include "ui_panels.hpp"
 
 #include "SFML/Graphics/RenderWindow.hpp"
 #include <SFML/Graphics.hpp>
@@ -33,10 +34,13 @@ public:
   [[nodiscard]] sf::Vector2f
   square_to_pixel(chesspp::core::Square square) const;
 
+  [[nodiscard]] sf::FloatRect popup_region() const noexcept;
+
 private:
   sf::RenderWindow &window_;
   std::optional<sf::Font> font_{};
   std::optional<sf::Texture> piece_texture_{};
+  UiPanels panels_{};
 
   void draw_square_highlight(chesspp::core::Square square, sf::Color color);
   [[nodiscard]] sf::IntRect piece_texture_rect(

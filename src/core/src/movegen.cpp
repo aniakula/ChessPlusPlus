@@ -80,6 +80,16 @@ bool MoveList::contains(const Move &move) const {
   return false;
 }
 
+bool MoveList::contains(const Square &square) const {
+  for (const Move &candidate : *this) {
+    if (candidate.to() == square) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 Bitboard MoveGenerator::square_mask(Square square) noexcept {
   return Bitboard{1} << square;
 }

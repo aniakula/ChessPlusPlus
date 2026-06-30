@@ -1,5 +1,8 @@
 #include "engine.hpp"
+#include "movegen.hpp"
+#include "search.hpp"
 #include <cstdint>
+#include <random>
 
 namespace chesspp::engine {
 
@@ -27,7 +30,18 @@ void Engine::set_transposition_table_size(std::size_t megabytes) {
 
 void Engine::clear_cache() noexcept { search_.clear_cache(); }
 
-SearchResult Engine::think() { return search_.search(board_, limits_); }
+SearchResult Engine::think() {
+  SearchResult dummy;
+  core::MoveList legal;
+  core::MoveGenerator::generate_legal(board_, legal);
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<size_t> distrib(0, legal.size() - 1);
+  size_t random_num = distrib(gen);
+  dummy.best_move = legal[random_num];
+  return dummy;
+  // return search_.search(board_, limits_);
+}
 
 SearchResult Engine::think(const SearchLimits &limits) {
   return search_.search(board_, limits);

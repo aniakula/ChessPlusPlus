@@ -3,6 +3,7 @@ add_executable(chesspp
     src/renderer.cpp
     src/input.cpp
     src/game_loop.cpp
+    src/ui_panels.cpp
 )
 
 target_include_directories(chesspp

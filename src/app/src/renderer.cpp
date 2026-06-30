@@ -1,12 +1,13 @@
 #include "renderer.hpp"
 
-#include <cmath>
+#include "ui_layout.hpp"
+#include "ui_panels.hpp"
 #include <filesystem>
 
 namespace {
 
-constexpr float BOARD_SIZE = 800.0F;
-constexpr float TILE_SIZE = BOARD_SIZE / 8.0F;
+constexpr float TILE_SIZE =
+    static_cast<float>(chesspp::app::ui_layout::TILE_SIZE);
 
 [[nodiscard]] char piece_letter(chesspp::core::Color color,
                                 chesspp::core::PieceType piece) {
@@ -73,7 +74,13 @@ void Renderer::draw(const chesspp::core::Game &game,
                     std::optional<chesspp::core::Square> selected_square,
                     const chesspp::core::MoveList &legal_moves,
                     const chesspp::core::Color human_color) {
-  window_.clear(sf::Color::Black);
+  window_.clear(sf::Color(24, 26, 30));
+
+  if (font_.has_value()) {
+    panels_.draw_left(window_, *font_, game, human_color);
+    panels_.draw_right(window_, *font_);
+  }
+
   draw_board(game.board());
 
   if (selected_square.has_value()) {
@@ -105,8 +112,10 @@ void Renderer::draw_board(const chesspp::core::Board &board) {
   for (int rank = 0; rank < 8; ++rank) {
     for (int file = 0; file < 8; ++file) {
       sf::RectangleShape square{{TILE_SIZE, TILE_SIZE}};
-      square.setPosition({static_cast<float>(file) * TILE_SIZE,
-                          static_cast<float>(7 - rank) * TILE_SIZE});
+      square.setPosition(
+          {ui_layout::BOARD_ORIGIN_X + static_cast<float>(file) * TILE_SIZE,
+           ui_layout::BOARD_ORIGIN_Y +
+               static_cast<float>(7 - rank) * TILE_SIZE});
       square.setFillColor(((file + rank) % 2 == 0) ? light : dark);
       window_.draw(square);
     }
@@ -173,34 +182,16 @@ void Renderer::draw_move_highlights(
 
 void Renderer::draw_status(const chesspp::core::Game &game) { (void)game; }
 
+sf::FloatRect Renderer::popup_region() const noexcept {
+  return panels_.popup_region();
+}
+
 chesspp::core::Square Renderer::pixel_to_square(sf::Vector2i pixel) const {
-  if (pixel.x < 0 || pixel.y < 0 || static_cast<float>(pixel.x) >= BOARD_SIZE ||
-      static_cast<float>(pixel.y) >= BOARD_SIZE) {
-    return chesspp::core::NO_SQUARE;
-  }
-
-  const int file =
-      static_cast<int>(std::floor(static_cast<float>(pixel.x) / TILE_SIZE));
-  const int screen_rank =
-      static_cast<int>(std::floor(static_cast<float>(pixel.y) / TILE_SIZE));
-  const int rank = 7 - screen_rank;
-
-  if (file < 0 || file >= 8 || rank < 0 || rank >= 8) {
-    return chesspp::core::NO_SQUARE;
-  }
-
-  return chesspp::core::square_from(file, rank);
+  return ui_layout::pixel_to_square(pixel);
 }
 
 sf::Vector2f Renderer::square_to_pixel(chesspp::core::Square square) const {
-  if (square == chesspp::core::NO_SQUARE) {
-    return {};
-  }
-
-  const int file = static_cast<int>(square % 8);
-  const int rank = static_cast<int>(square / 8);
-  return {static_cast<float>(file) * TILE_SIZE,
-          static_cast<float>(7 - rank) * TILE_SIZE};
+  return ui_layout::square_to_pixel(square);
 }
 
 void Renderer::draw_square_highlight(chesspp::core::Square square,

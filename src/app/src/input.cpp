@@ -3,47 +3,49 @@
 #include "SFML/Window/Mouse.hpp"
 #include "movegen.hpp"
 #include "types.hpp"
+#include "ui_layout.hpp"
 
 namespace chesspp::app {
-
-namespace {
-
-constexpr int BOARD_SIZE = 800;
-constexpr int TILE_SIZE = BOARD_SIZE / 8;
-
-} // namespace
 
 InputAction
 InputHandler::transform_event(const sf::Event &event,
                               const chesspp::core::Game &game,
                               const chesspp::core::Color human_color) {
   if (const auto *mouse_press = event.getIf<sf::Event::MouseButtonPressed>()) {
-    if (mouse_press->button != sf::Mouse::Button::Left) {
+    if (mouse_press->button != sf::Mouse::Button::Left ||
+        game.board().side_to_move() != human_color) {
       return {};
     }
 
     const chesspp::core::Square clicked =
-        pixel_to_square(mouse_press->position);
+        ui_layout::pixel_to_square(mouse_press->position);
     if (clicked == chesspp::core::NO_SQUARE) {
       clear_selection();
       return {};
     }
 
     selected_square_ = clicked;
-    legal_moves_.clear();
-
     InputAction action{};
-    action.type = InputAction::Type::SelectSquare;
     action.square = clicked;
+    for (const core::Move &move : legal_moves_) {
+      if (move.to() == clicked) {
+        action.type = InputAction::Type::PlayMove;
+        action.move = move;
+      }
+    }
 
-    const auto piece = game.board().piece_and_color_on(clicked);
-    if (piece.has_value() && piece->first == human_color &&
-        game.board().side_to_move() == human_color &&
-        piece->second != core::PieceType::None) {
-      chesspp::core::Board board_copy = game.board();
-      chesspp::core::Square from = clicked;
-      core::MoveGenerator::generate_legal(board_copy, legal_moves_, from);
-      action.legal_moves = legal_moves_;
+    legal_moves_.clear();
+    if (action.type == InputAction::Type::None) {
+      action.type = InputAction::Type::SelectSquare;
+      const auto piece = game.board().piece_and_color_on(clicked);
+      if (piece.has_value() && piece->first == human_color &&
+          game.board().side_to_move() == human_color &&
+          piece->second != core::PieceType::None) {
+        chesspp::core::Board board_copy = game.board();
+        chesspp::core::Square from = clicked;
+        core::MoveGenerator::generate_legal(board_copy, legal_moves_, from);
+        action.legal_moves = legal_moves_;
+      }
     }
 
     return action;
@@ -64,20 +66,6 @@ InputHandler::selected_square() const noexcept {
 
 const chesspp::core::MoveList &InputHandler::legal_moves() const noexcept {
   return legal_moves_;
-}
-
-chesspp::core::Square
-InputHandler::pixel_to_square(sf::Vector2i pixel) const noexcept {
-  if (pixel.x < 0 || pixel.y < 0 || pixel.x >= BOARD_SIZE ||
-      pixel.y >= BOARD_SIZE) {
-    return chesspp::core::NO_SQUARE;
-  }
-
-  const int file = pixel.x / TILE_SIZE;
-  const int screen_rank = pixel.y / TILE_SIZE;
-  const int rank = 7 - screen_rank;
-
-  return chesspp::core::square_from(file, rank);
 }
 
 std::optional<chesspp::core::Move>
