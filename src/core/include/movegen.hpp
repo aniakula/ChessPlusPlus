@@ -32,24 +32,17 @@ private:
   std::size_t size_{0};
 };
 
-enum class MoveGenerationType : std::uint8_t {
-  All,
-  CapturesOnly,
-  QuietOnly,
-  Evasions,
-};
-
 namespace MoveGenerator {
 
-// add all moves in position theoretically possible to MoveList ref
-void generate_pseudo_legal(
-    const Board &board, MoveList &moves,
-    MoveGenerationType type = MoveGenerationType::All) noexcept;
+void generate_pseudo_legal(const Board &board, MoveList &moves) noexcept;
+void generate_pseudo_legal(const Board &board, MoveList &moves, Square &square);
 
 void generate_legal(Board &board, MoveList &moves) noexcept;
 
-// Attack helpers are critical for fast legality checks, check detection, and
-// future quiescence/search extensions.
+void generate_legal(Board &board, MoveList &moves, Square &square);
+
+// Attack helpers are critical for fast legality checks, check detection,
+// and future quiescence/search extensions.
 [[nodiscard]] Bitboard pawn_attacks(Color color, Square square) noexcept;
 [[nodiscard]] Bitboard knight_attacks(Square square) noexcept;
 [[nodiscard]] Bitboard bishop_attacks(Square square,
@@ -63,18 +56,12 @@ void generate_legal(Board &board, MoveList &moves) noexcept;
 [[nodiscard]] Bitboard ray_attacks(Square square, int dr, int df,
                                    Bitboard occupancy) noexcept;
 
-void generate_pseudo_legal_pawns(const Board &board, MoveList &moves,
-                                 MoveGenerationType type) noexcept;
-void generate_pseudo_legal_knights(const Board &board, MoveList &moves,
-                                   MoveGenerationType type) noexcept;
-void generate_pseudo_legal_bishops(const Board &board, MoveList &moves,
-                                   MoveGenerationType type) noexcept;
-void generate_pseudo_legal_rooks(const Board &board, MoveList &moves,
-                                 MoveGenerationType type) noexcept;
-void generate_pseudo_legal_queens(const Board &board, MoveList &moves,
-                                  MoveGenerationType type) noexcept;
-void generate_pseudo_legal_king(const Board &board, MoveList &moves,
-                                MoveGenerationType type) noexcept;
+void generate_legal_pawns(const Board &board, MoveList &moves) noexcept;
+void generate_legal_knights(const Board &board, MoveList &moves) noexcept;
+void generate_legal_bishops(const Board &board, MoveList &moves) noexcept;
+void generate_legal_rooks(const Board &board, MoveList &moves) noexcept;
+void generate_legal_queens(const Board &board, MoveList &moves) noexcept;
+void generate_legal_king(const Board &board, MoveList &moves) noexcept;
 [[nodiscard]] bool leaves_king_safe(Board &board, Move move) noexcept;
 
 inline constexpr std::array<std::array<int8_t, 2>, 8> knightDeltas = {{

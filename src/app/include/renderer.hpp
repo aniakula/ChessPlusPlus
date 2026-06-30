@@ -21,7 +21,8 @@ public:
   void draw(const chesspp::core::Game &game);
   void draw(const chesspp::core::Game &game,
             std::optional<chesspp::core::Square> selected_square,
-            const chesspp::core::MoveList &legal_moves);
+            const chesspp::core::MoveList &legal_moves,
+            chesspp::core::Color human_color);
   void draw_board(const chesspp::core::Board &board);
   void draw_piece(chesspp::core::Square square, chesspp::core::Color color,
                   chesspp::core::PieceType piece);

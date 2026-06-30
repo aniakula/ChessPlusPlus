@@ -27,7 +27,8 @@ void GameLoop::run() {
         window_.close();
         break;
       }
-      const InputAction action = input_.transform_event(*event, game_);
+      const InputAction action =
+          input_.transform_event(*event, game_, human_color_);
       handle_action(action);
     }
 
@@ -35,7 +36,8 @@ void GameLoop::run() {
       play_engine_turn();
     }
 
-    renderer_.draw(game_, input_.selected_square(), {});
+    renderer_.draw(game_, input_.selected_square(), input_.legal_moves(),
+                   human_color_);
   }
 }
 

@@ -66,20 +66,22 @@ bool Renderer::load_assets(const char *asset_root) {
 }
 
 void Renderer::draw(const chesspp::core::Game &game) {
-  draw(game, std::nullopt, {});
+  draw(game, std::nullopt, {}, chesspp::core::Color::White);
 }
 
 void Renderer::draw(const chesspp::core::Game &game,
                     std::optional<chesspp::core::Square> selected_square,
-                    const chesspp::core::MoveList &legal_moves) {
+                    const chesspp::core::MoveList &legal_moves,
+                    const chesspp::core::Color human_color) {
   window_.clear(sf::Color::Black);
   draw_board(game.board());
 
   if (selected_square.has_value()) {
     draw_square_highlight(*selected_square, sf::Color(255, 215, 0, 110));
+    if (game.board().color_on(selected_square.value()) == human_color) {
+      draw_move_highlights(legal_moves);
+    }
   }
-
-  draw_move_highlights(legal_moves);
 
   for (int square = 0; square < chesspp::core::SQUARE_COUNT; ++square) {
     const auto piece = game.board().piece_and_color_on(

@@ -2,6 +2,7 @@
 
 #include "board.hpp"
 #include "movegen.hpp"
+#include "types.hpp"
 
 #include <cstddef>
 #include <vector>
@@ -21,7 +22,6 @@ public:
   [[nodiscard]] MoveList legal_moves() const;
   [[nodiscard]] bool is_legal(Move move) const;
   [[nodiscard]] bool try_make_move(Move move);
-
   [[nodiscard]] bool is_check() const;
   [[nodiscard]] bool is_checkmate() const;
   [[nodiscard]] bool is_stalemate() const;
@@ -35,7 +35,6 @@ public:
 private:
   Board board_{};
   std::vector<HashKey> repetition_history_{};
-
   void record_repetition_key();
   [[nodiscard]] std::size_t repetition_count(HashKey key) const;
   [[nodiscard]] bool has_insufficient_material() const;

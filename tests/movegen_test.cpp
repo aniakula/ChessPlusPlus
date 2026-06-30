@@ -32,13 +32,24 @@ std::size_t count_from(const MoveList &list, Square from) {
   return count;
 }
 
-bool all_moves_have_capture_flag(const MoveList &list) {
+std::size_t count_captures(const MoveList &list) {
+  std::size_t count = 0;
   for (const Move &move : list) {
-    if (!has_flag(move.flags(), MoveFlag::Capture)) {
-      return false;
+    if (has_flag(move.flags(), MoveFlag::Capture)) {
+      ++count;
     }
   }
-  return true;
+  return count;
+}
+
+std::size_t count_quiets(const MoveList &list) {
+  std::size_t count = 0;
+  for (const Move &move : list) {
+    if (!has_flag(move.flags(), MoveFlag::Capture)) {
+      ++count;
+    }
+  }
+  return count;
 }
 
 bool no_moves_have_capture_flag(const MoveList &list) {
@@ -157,8 +168,7 @@ TEST(MoveGenAttackTest, BishopAttacksBlockedInclusive) {
 TEST(MoveGenPieceTest, KnightQuietMovesOnOpenBoard) {
   const Board board = Board::from_fen("4k3/8/8/8/3N4/8/8/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_knights(board, moves,
-                                               MoveGenerationType::All);
+  MoveGenerator::generate_legal_knights(board, moves);
 
   EXPECT_EQ(count_from(moves, sq('d', '4')), 8U);
   for (const char *target : {"b3", "b5", "c2", "c6", "e2", "e6", "f3", "f5"}) {
@@ -170,8 +180,7 @@ TEST(MoveGenPieceTest, KnightQuietMovesOnOpenBoard) {
 TEST(MoveGenPieceTest, KnightCaptureFlaggedCorrectly) {
   const Board board = Board::from_fen("4k3/8/4p3/8/3N4/8/8/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_knights(board, moves,
-                                               MoveGenerationType::All);
+  MoveGenerator::generate_legal_knights(board, moves);
 
   EXPECT_EQ(count_from(moves, sq('d', '4')), 8U);
   EXPECT_TRUE(has_move(moves, sq('d', '4'), sq('e', '6'), MoveFlag::Capture));
@@ -183,38 +192,22 @@ TEST(MoveGenPieceTest, KnightCaptureFlaggedCorrectly) {
 TEST(MoveGenPieceTest, KnightBlockedByFriendlyPiece) {
   const Board board = Board::from_fen("4k3/8/4P3/8/3N4/8/8/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_knights(board, moves,
-                                               MoveGenerationType::All);
+  MoveGenerator::generate_legal_knights(board, moves);
 
   EXPECT_EQ(count_from(moves, sq('d', '4')), 7U);
   EXPECT_FALSE(has_move(moves, sq('d', '4'), sq('e', '6'), MoveFlag::Quiet));
   EXPECT_FALSE(has_move(moves, sq('d', '4'), sq('e', '6'), MoveFlag::Capture));
 }
 
-TEST(MoveGenPieceTest, GenerationTypeFiltersCapturesAndQuiets) {
+TEST(MoveGenPieceTest, MoveFlagsPartitionCapturesAndQuiets) {
   const Board board = Board::from_fen("4k3/8/4p3/8/3N4/8/8/4K3 w - - 0 1");
 
-  MoveList all;
-  MoveGenerator::generate_pseudo_legal_knights(board, all,
-                                               MoveGenerationType::All);
-  EXPECT_EQ(all.size(), 8U);
-
-  MoveList captures;
-  MoveGenerator::generate_pseudo_legal_knights(board, captures,
-                                               MoveGenerationType::CapturesOnly);
-  ASSERT_EQ(captures.size(), 1U);
-  EXPECT_TRUE(has_move(captures, sq('d', '4'), sq('e', '6'), MoveFlag::Capture));
-
-  MoveList quiets;
-  MoveGenerator::generate_pseudo_legal_knights(board, quiets,
-                                               MoveGenerationType::QuietOnly);
-  EXPECT_EQ(quiets.size(), 7U);
-  EXPECT_TRUE(no_moves_have_capture_flag(quiets));
-
-  MoveList evasions;
-  MoveGenerator::generate_pseudo_legal_knights(board, evasions,
-                                               MoveGenerationType::Evasions);
-  EXPECT_EQ(evasions.size(), 8U); // Evasions currently behaves like All.
+  MoveList moves;
+  MoveGenerator::generate_legal_knights(board, moves);
+  EXPECT_EQ(moves.size(), 8U);
+  EXPECT_EQ(count_captures(moves), 1U);
+  EXPECT_EQ(count_quiets(moves), 7U);
+  EXPECT_TRUE(has_move(moves, sq('d', '4'), sq('e', '6'), MoveFlag::Capture));
 }
 
 // ---------------------------------------------------------------------------
@@ -224,14 +217,12 @@ TEST(MoveGenPieceTest, GenerationTypeFiltersCapturesAndQuiets) {
 TEST(MoveGenPieceTest, BishopOpenBoardAndCapture) {
   const Board open = Board::from_fen("4k3/8/8/8/3B4/8/8/4K3 w - - 0 1");
   MoveList open_moves;
-  MoveGenerator::generate_pseudo_legal_bishops(open, open_moves,
-                                               MoveGenerationType::All);
+  MoveGenerator::generate_legal_bishops(open, open_moves);
   EXPECT_EQ(count_from(open_moves, sq('d', '4')), 13U);
 
   const Board blocked = Board::from_fen("4k3/6p1/8/8/3B4/8/8/4K3 w - - 0 1");
   MoveList blocked_moves;
-  MoveGenerator::generate_pseudo_legal_bishops(blocked, blocked_moves,
-                                               MoveGenerationType::All);
+  MoveGenerator::generate_legal_bishops(blocked, blocked_moves);
   EXPECT_EQ(count_from(blocked_moves, sq('d', '4')), 12U);
   EXPECT_TRUE(has_move(blocked_moves, sq('d', '4'), sq('g', '7'),
                        MoveFlag::Capture));
@@ -243,14 +234,12 @@ TEST(MoveGenPieceTest, BishopOpenBoardAndCapture) {
 TEST(MoveGenPieceTest, RookOpenBoardAndCapture) {
   const Board open = Board::from_fen("4k3/8/8/8/3R4/8/8/4K3 w - - 0 1");
   MoveList open_moves;
-  MoveGenerator::generate_pseudo_legal_rooks(open, open_moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_rooks(open, open_moves);
   EXPECT_EQ(count_from(open_moves, sq('d', '4')), 14U);
 
   const Board blocked = Board::from_fen("4k3/3p4/8/8/3R4/8/8/4K3 w - - 0 1");
   MoveList blocked_moves;
-  MoveGenerator::generate_pseudo_legal_rooks(blocked, blocked_moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_rooks(blocked, blocked_moves);
   EXPECT_EQ(count_from(blocked_moves, sq('d', '4')), 13U);
   EXPECT_TRUE(has_move(blocked_moves, sq('d', '4'), sq('d', '7'),
                        MoveFlag::Capture));
@@ -260,8 +249,7 @@ TEST(MoveGenPieceTest, RookOpenBoardAndCapture) {
 TEST(MoveGenPieceTest, QueenOpenBoardCombinesBishopAndRook) {
   const Board board = Board::from_fen("4k3/8/8/8/3Q4/8/8/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_queens(board, moves,
-                                              MoveGenerationType::All);
+  MoveGenerator::generate_legal_queens(board, moves);
   EXPECT_EQ(count_from(moves, sq('d', '4')), 27U);
 }
 
@@ -272,8 +260,7 @@ TEST(MoveGenPieceTest, QueenOpenBoardCombinesBishopAndRook) {
 TEST(MoveGenPieceTest, KingQuietMovesNoCastlingRights) {
   const Board board = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_king(board, moves,
-                                            MoveGenerationType::All);
+  MoveGenerator::generate_legal_king(board, moves);
   EXPECT_EQ(moves.size(), 5U);
   for (const char *target : {"d1", "f1", "d2", "e2", "f2"}) {
     EXPECT_TRUE(has_move(moves, sq('e', '1'), sq(target[0], target[1])));
@@ -284,8 +271,7 @@ TEST(MoveGenPieceTest, KingCastlesBothSidesWhenLegal) {
   const Board board =
       Board::from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_king(board, moves,
-                                            MoveGenerationType::All);
+  MoveGenerator::generate_legal_king(board, moves);
   EXPECT_EQ(moves.size(), 7U);
   EXPECT_TRUE(has_move(moves, sq('e', '1'), sq('g', '1'), MoveFlag::KingCastle));
   EXPECT_TRUE(has_move(moves, sq('e', '1'), sq('c', '1'), MoveFlag::QueenCastle));
@@ -296,8 +282,7 @@ TEST(MoveGenPieceTest, KingCastleBlockedWhenTransitSquareAttacked) {
   // queenside remains legal.
   const Board board = Board::from_fen("4k3/5r2/8/8/8/8/8/R3K2R w KQ - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_king(board, moves,
-                                            MoveGenerationType::All);
+  MoveGenerator::generate_legal_king(board, moves);
   EXPECT_FALSE(has_move(moves, sq('e', '1'), sq('g', '1'), MoveFlag::KingCastle));
   EXPECT_TRUE(has_move(moves, sq('e', '1'), sq('c', '1'), MoveFlag::QueenCastle));
 }
@@ -306,8 +291,7 @@ TEST(MoveGenPieceTest, KingDoesNotCastleWhileInCheck) {
   // Black rook on e2 checks the white king, so no castling is generated.
   const Board board = Board::from_fen("4k3/8/8/8/8/8/4r3/R3K2R w KQ - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_king(board, moves,
-                                            MoveGenerationType::All);
+  MoveGenerator::generate_legal_king(board, moves);
   EXPECT_FALSE(has_move(moves, sq('e', '1'), sq('g', '1'), MoveFlag::KingCastle));
   EXPECT_FALSE(has_move(moves, sq('e', '1'), sq('c', '1'), MoveFlag::QueenCastle));
   EXPECT_TRUE(has_move(moves, sq('e', '1'), sq('e', '2'), MoveFlag::Capture));
@@ -316,8 +300,7 @@ TEST(MoveGenPieceTest, KingDoesNotCastleWhileInCheck) {
 TEST(MoveGenPieceTest, KingNoCastleWithoutRights) {
   const Board board = Board::from_fen("r3k2r/8/8/8/8/8/8/R3K2R w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_king(board, moves,
-                                            MoveGenerationType::All);
+  MoveGenerator::generate_legal_king(board, moves);
   EXPECT_EQ(moves.size(), 5U);
   EXPECT_FALSE(has_move(moves, sq('e', '1'), sq('g', '1'), MoveFlag::KingCastle));
   EXPECT_FALSE(has_move(moves, sq('e', '1'), sq('c', '1'), MoveFlag::QueenCastle));
@@ -330,8 +313,7 @@ TEST(MoveGenPieceTest, KingNoCastleWithoutRights) {
 TEST(MoveGenPieceTest, PawnSingleAndDoublePush) {
   const Board board = Board::from_fen("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_pawns(board, moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_pawns(board, moves);
   EXPECT_EQ(count_from(moves, sq('e', '2')), 2U);
   EXPECT_TRUE(has_move(moves, sq('e', '2'), sq('e', '3'), MoveFlag::Quiet));
   EXPECT_TRUE(
@@ -341,16 +323,14 @@ TEST(MoveGenPieceTest, PawnSingleAndDoublePush) {
 TEST(MoveGenPieceTest, PawnSinglePushBlockedRemovesAllPushes) {
   const Board board = Board::from_fen("4k3/8/8/8/8/4n3/4P3/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_pawns(board, moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_pawns(board, moves);
   EXPECT_EQ(count_from(moves, sq('e', '2')), 0U);
 }
 
 TEST(MoveGenPieceTest, PawnDoublePushBlockedKeepsSinglePush) {
   const Board board = Board::from_fen("4k3/8/8/8/4n3/8/4P3/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_pawns(board, moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_pawns(board, moves);
   EXPECT_EQ(count_from(moves, sq('e', '2')), 1U);
   EXPECT_TRUE(has_move(moves, sq('e', '2'), sq('e', '3'), MoveFlag::Quiet));
   EXPECT_FALSE(
@@ -360,8 +340,7 @@ TEST(MoveGenPieceTest, PawnDoublePushBlockedKeepsSinglePush) {
 TEST(MoveGenPieceTest, PawnCapturesBothDiagonals) {
   const Board board = Board::from_fen("4k3/8/8/8/8/3n1n2/4P3/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_pawns(board, moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_pawns(board, moves);
   EXPECT_EQ(count_from(moves, sq('e', '2')), 4U);
   EXPECT_TRUE(has_move(moves, sq('e', '2'), sq('d', '3'), MoveFlag::Capture));
   EXPECT_TRUE(has_move(moves, sq('e', '2'), sq('f', '3'), MoveFlag::Capture));
@@ -373,8 +352,7 @@ TEST(MoveGenPieceTest, PawnCapturesBothDiagonals) {
 TEST(MoveGenPieceTest, PawnPromotionGeneratesAllFourPieces) {
   const Board board = Board::from_fen("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_pawns(board, moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_pawns(board, moves);
   EXPECT_EQ(count_from(moves, sq('a', '7')), 4U);
   for (PieceType promo : {PieceType::Queen, PieceType::Rook, PieceType::Bishop,
                           PieceType::Knight}) {
@@ -386,8 +364,7 @@ TEST(MoveGenPieceTest, PawnPromotionGeneratesAllFourPieces) {
 TEST(MoveGenPieceTest, PawnPromotionWithCapture) {
   const Board board = Board::from_fen("1n2k3/P7/8/8/8/8/8/4K3 w - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_pawns(board, moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_pawns(board, moves);
   EXPECT_EQ(count_from(moves, sq('a', '7')), 8U);
   for (PieceType promo : {PieceType::Queen, PieceType::Rook, PieceType::Bishop,
                           PieceType::Knight}) {
@@ -401,8 +378,7 @@ TEST(MoveGenPieceTest, PawnPromotionWithCapture) {
 TEST(MoveGenPieceTest, PawnEnPassantCapture) {
   const Board board = Board::from_fen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_pawns(board, moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_pawns(board, moves);
   EXPECT_EQ(count_from(moves, sq('e', '5')), 2U);
   EXPECT_TRUE(has_move(moves, sq('e', '5'), sq('e', '6'), MoveFlag::Quiet));
   EXPECT_TRUE(has_move(moves, sq('e', '5'), sq('d', '6'),
@@ -412,8 +388,7 @@ TEST(MoveGenPieceTest, PawnEnPassantCapture) {
 TEST(MoveGenPieceTest, BlackPawnPushesDownBoard) {
   const Board board = Board::from_fen("4k3/4p3/8/8/8/8/8/4K3 b - - 0 1");
   MoveList moves;
-  MoveGenerator::generate_pseudo_legal_pawns(board, moves,
-                                             MoveGenerationType::All);
+  MoveGenerator::generate_legal_pawns(board, moves);
   EXPECT_EQ(count_from(moves, sq('e', '7')), 2U);
   EXPECT_TRUE(has_move(moves, sq('e', '7'), sq('e', '6'), MoveFlag::Quiet));
   EXPECT_TRUE(
@@ -444,27 +419,17 @@ TEST(MoveGenFullTest, StartingPositionHasTwentyMoves) {
   EXPECT_TRUE(no_moves_have_capture_flag(legal));
 }
 
-TEST(MoveGenFullTest, CapturesOnlyAndQuietOnlyPartitionMoves) {
+TEST(MoveGenFullTest, CaptureAndQuietFlagsPartitionPseudoLegalMoves) {
   // White pawn e4, black pawn d5: pawn can push (quiet) or capture; king has
   // only quiet moves.
   const Board board = Board::from_fen("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1");
 
-  MoveList all;
-  MoveGenerator::generate_pseudo_legal(board, all, MoveGenerationType::All);
-  EXPECT_EQ(all.size(), 7U);
-
-  MoveList captures;
-  MoveGenerator::generate_pseudo_legal(board, captures,
-                                       MoveGenerationType::CapturesOnly);
-  ASSERT_EQ(captures.size(), 1U);
-  EXPECT_TRUE(all_moves_have_capture_flag(captures));
-  EXPECT_TRUE(has_move(captures, sq('e', '4'), sq('d', '5'), MoveFlag::Capture));
-
-  MoveList quiets;
-  MoveGenerator::generate_pseudo_legal(board, quiets,
-                                       MoveGenerationType::QuietOnly);
-  EXPECT_EQ(quiets.size(), 6U);
-  EXPECT_TRUE(no_moves_have_capture_flag(quiets));
+  MoveList moves;
+  MoveGenerator::generate_pseudo_legal(board, moves);
+  EXPECT_EQ(moves.size(), 7U);
+  EXPECT_EQ(count_captures(moves), 1U);
+  EXPECT_EQ(count_quiets(moves), 6U);
+  EXPECT_TRUE(has_move(moves, sq('e', '4'), sq('d', '5'), MoveFlag::Capture));
 }
 
 TEST(MoveGenFullTest, LegalGenerationFiltersMovesIntoCheck) {
@@ -473,8 +438,7 @@ TEST(MoveGenFullTest, LegalGenerationFiltersMovesIntoCheck) {
   const Board board = Board::from_fen("4k3/8/8/8/8/8/4q3/4K3 w - - 0 1");
 
   MoveList pseudo_king;
-  MoveGenerator::generate_pseudo_legal_king(board, pseudo_king,
-                                            MoveGenerationType::All);
+  MoveGenerator::generate_legal_king(board, pseudo_king);
   EXPECT_EQ(pseudo_king.size(), 5U);
 
   Board copy = board;

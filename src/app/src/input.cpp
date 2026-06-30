@@ -1,6 +1,8 @@
 #include "input.hpp"
 
 #include "SFML/Window/Mouse.hpp"
+#include "movegen.hpp"
+#include "types.hpp"
 
 namespace chesspp::app {
 
@@ -11,8 +13,10 @@ constexpr int TILE_SIZE = BOARD_SIZE / 8;
 
 } // namespace
 
-InputAction InputHandler::transform_event(const sf::Event &event,
-                                          const chesspp::core::Game &game) {
+InputAction
+InputHandler::transform_event(const sf::Event &event,
+                              const chesspp::core::Game &game,
+                              const chesspp::core::Color human_color) {
   if (const auto *mouse_press = event.getIf<sf::Event::MouseButtonPressed>()) {
     if (mouse_press->button != sf::Mouse::Button::Left) {
       return {};
@@ -26,26 +30,40 @@ InputAction InputHandler::transform_event(const sf::Event &event,
     }
 
     selected_square_ = clicked;
-
-    // Temporary behavior until legal move generation/input move selection is
-    // complete: every click selects and highlights exactly that square.
-    const auto piece = game.board().piece_and_color_on(clicked);
-    (void)piece;
+    legal_moves_.clear();
 
     InputAction action{};
     action.type = InputAction::Type::SelectSquare;
     action.square = clicked;
+
+    const auto piece = game.board().piece_and_color_on(clicked);
+    if (piece.has_value() && piece->first == human_color &&
+        game.board().side_to_move() == human_color &&
+        piece->second != core::PieceType::None) {
+      chesspp::core::Board board_copy = game.board();
+      chesspp::core::Square from = clicked;
+      core::MoveGenerator::generate_legal(board_copy, legal_moves_, from);
+      action.legal_moves = legal_moves_;
+    }
+
     return action;
   }
 
   return {};
 }
 
-void InputHandler::clear_selection() noexcept { selected_square_.reset(); }
+void InputHandler::clear_selection() noexcept {
+  selected_square_.reset();
+  legal_moves_.clear();
+}
 
 std::optional<chesspp::core::Square>
 InputHandler::selected_square() const noexcept {
   return selected_square_;
+}
+
+const chesspp::core::MoveList &InputHandler::legal_moves() const noexcept {
+  return legal_moves_;
 }
 
 chesspp::core::Square

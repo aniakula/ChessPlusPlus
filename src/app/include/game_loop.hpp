@@ -17,12 +17,12 @@ public:
   void run();
 
 private:
+  chesspp::core::Color human_color_{chesspp::core::Color::White};
   sf::RenderWindow window_;
   chesspp::core::Game game_{};
   chesspp::engine::Engine engine_{};
   Renderer renderer_;
   InputHandler input_{};
-  chesspp::core::Color human_color_{chesspp::core::Color::White};
 
   void handle_action(const InputAction &action);
   void play_engine_turn();
