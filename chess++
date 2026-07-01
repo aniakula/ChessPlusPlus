@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Build (if needed) and launch the Chess++ GUI.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILD_DIR="${ROOT}/build"
+BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
+
+if command -v nproc >/dev/null 2>&1; then
+  JOBS="$(nproc)"
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+  JOBS="$(sysctl -n hw.ncpu)"
+else
+  JOBS=4
+fi
+
+if [[ ! -f "${BUILD_DIR}/CMakeCache.txt" ]]; then
+  echo "Configuring Chess++ (${BUILD_TYPE})..."
+  cmake -S "${ROOT}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+fi
+
+echo "Building Chess++..."
+cmake --build "${BUILD_DIR}" --target chesspp -j"${JOBS}"
+
+BIN="${BUILD_DIR}/src/app/chesspp"
+if [[ ! -x "${BIN}" ]]; then
+  BIN="${BUILD_DIR}/chesspp"
+fi
+
+if [[ ! -x "${BIN}" ]]; then
+  echo "error: could not find chesspp binary under ${BUILD_DIR}" >&2
+  exit 1
+fi
+
+# Assets are loaded from paths relative to the repository root.
+cd "${ROOT}"
+exec "${BIN}" "$@"
