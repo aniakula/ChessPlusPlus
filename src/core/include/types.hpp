@@ -145,6 +145,12 @@ enum class MoveFlag : std::uint16_t {
           static_cast<std::uint16_t>(flag)) != 0;
 }
 
+[[nodiscard]] constexpr Square pop_lsb(Bitboard &bitboard) noexcept {
+  const Square square = static_cast<Square>(std::countr_zero(bitboard));
+  bitboard &= bitboard - 1;
+  return square;
+}
+
 // move encoding Layout:
 // bits 0-5   from square
 // bits 6-11  to square
