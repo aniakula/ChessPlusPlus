@@ -1,6 +1,7 @@
 #include "evaluator.hpp"
 #include "types.hpp"
 #include <array>
+#include <cstdint>
 
 namespace chesspp::engine {
 
@@ -45,6 +46,7 @@ Evaluator::positional_score(const chesspp::core::Board &board,
                             const core::Color side) const noexcept {
 
   core::Score position_score = 0;
+  uint8_t colorInd = side == core::Color::White ? 0 : 1;
   const core::Phase phase = board.curr_phase();
 
   std::array<core::Bitboard, 6> board_by_piece{
@@ -58,7 +60,8 @@ Evaluator::positional_score(const chesspp::core::Board &board,
   for (size_t pieceInd = 0; pieceInd < board_by_piece.size(); pieceInd++) {
     while (board_by_piece[pieceInd]) {
       core::Square position = core::pop_lsb(board_by_piece[pieceInd]);
-      position_score += core::taper(position_tables[pieceInd][position], phase);
+      position_score +=
+          core::taper(position_tables[colorInd][pieceInd][position], phase);
     }
   }
 

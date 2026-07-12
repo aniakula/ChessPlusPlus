@@ -35,6 +35,7 @@ public:
 
   [[nodiscard]] bool probe(chesspp::core::HashKey key,
                            TranspositionEntry &out) const noexcept;
+
   void store(const TranspositionEntry &entry) noexcept;
 
 private:

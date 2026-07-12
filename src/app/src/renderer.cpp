@@ -77,7 +77,8 @@ void Renderer::draw(const chesspp::core::Game &game,
   window_.clear(sf::Color(24, 26, 30));
 
   if (font_.has_value()) {
-    panels_.draw_left(window_, *font_, game, human_color);
+    const chesspp::core::Score evaluation = evaluator_.evaluate(game.board());
+    panels_.draw_left(window_, *font_, game, human_color, evaluation);
     panels_.draw_right(window_, *font_);
   }
 

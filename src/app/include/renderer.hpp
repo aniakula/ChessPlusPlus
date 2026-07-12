@@ -1,6 +1,7 @@
 #pragma once
 
 #include "board.hpp"
+#include "evaluator.hpp"
 #include "game.hpp"
 #include "ui_panels.hpp"
 
@@ -41,10 +42,12 @@ private:
   std::optional<sf::Font> font_{};
   std::optional<sf::Texture> piece_texture_{};
   UiPanels panels_{};
+  chesspp::engine::Evaluator evaluator_{};
 
   void draw_square_highlight(chesspp::core::Square square, sf::Color color);
-  [[nodiscard]] sf::IntRect piece_texture_rect(
-      chesspp::core::Color color, chesspp::core::PieceType piece) const;
+  [[nodiscard]] sf::IntRect
+  piece_texture_rect(chesspp::core::Color color,
+                     chesspp::core::PieceType piece) const;
 };
 
 } // namespace chesspp::app

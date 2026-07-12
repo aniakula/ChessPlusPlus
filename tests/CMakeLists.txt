@@ -17,6 +17,7 @@ add_executable(board_tests
     movelist_test.cpp
     movegen_test.cpp
     game_test.cpp
+    evaluator_test.cpp
 )
 
 target_include_directories(board_tests

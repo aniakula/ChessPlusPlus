@@ -14,7 +14,8 @@ class UiPanels {
 public:
   void draw_left(sf::RenderWindow &window, const sf::Font &font,
                  const chesspp::core::Game &game,
-                 chesspp::core::Color human_color) const;
+                 chesspp::core::Color human_color,
+                 chesspp::core::Score evaluation) const;
   void draw_right(sf::RenderWindow &window, const sf::Font &font) const;
 
   [[nodiscard]] sf::FloatRect popup_region() const noexcept;
@@ -28,8 +29,10 @@ private:
                         const char *body, unsigned title_size = 16U,
                         unsigned body_size = 13U) const;
   void draw_stub_button(sf::RenderWindow &window, const sf::Font &font,
-                        const sf::FloatRect &bounds,
-                        const char *label) const;
+                        const sf::FloatRect &bounds, const char *label) const;
+  void draw_eval_bar(sf::RenderWindow &window, const sf::Font &font,
+                     const sf::FloatRect &bounds,
+                     chesspp::core::Score evaluation) const;
 };
 
 } // namespace chesspp::app

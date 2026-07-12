@@ -31,6 +31,7 @@ void Engine::set_transposition_table_size(std::size_t megabytes) {
 void Engine::clear_cache() noexcept { search_.clear_cache(); }
 
 SearchResult Engine::think() {
+  //temporary random moves:
   SearchResult dummy;
   core::MoveList legal;
   core::MoveGenerator::generate_legal(board_, legal);
