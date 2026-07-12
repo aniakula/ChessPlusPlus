@@ -8,21 +8,26 @@ Evaluator::Evaluator(EvaluationConfig config) : config_{config} {}
 
 chesspp::core::Score
 Evaluator::evaluate(const chesspp::core::Board &board) const noexcept {
-
-  return material_score(board) + piece_square_score(board);
+  core::Score final_score = material_score(board, core::Color::White) -
+                            material_score(board, core::Color::Black);
+  final_score += positional_score(board, core::Color::White) -
+                 positional_score(board, core::Color::Black);
+  final_score += advantages_score(board, core::Color::White) -
+                 advantages_score(board, core::Color::Black);
+  return final_score;
 }
 
 chesspp::core::Score
-Evaluator::material_score(const chesspp::core::Board &board) const noexcept {
+Evaluator::material_score(const chesspp::core::Board &board,
+                          const core::Color side) const noexcept {
   core::Score mat_score = 0;
-  core::Color us = board.side_to_move();
-  // TODO: Iterate piece bitboards and add piece-square table bonuses.
+
   std::array<core::Bitboard, 5> board_by_piece{
-      board.pieces(us, core::PieceType::Pawn),
-      board.pieces(us, core::PieceType::Knight),
-      board.pieces(us, core::PieceType::Bishop),
-      board.pieces(us, core::PieceType::Rook),
-      board.pieces(us, core::PieceType::Queen)};
+      board.pieces(side, core::PieceType::Pawn),
+      board.pieces(side, core::PieceType::Knight),
+      board.pieces(side, core::PieceType::Bishop),
+      board.pieces(side, core::PieceType::Rook),
+      board.pieces(side, core::PieceType::Queen)};
 
   for (size_t pieceInd = 0; pieceInd < board_by_piece.size(); pieceInd++) {
     while (board_by_piece[pieceInd]) {
@@ -35,27 +40,42 @@ Evaluator::material_score(const chesspp::core::Board &board) const noexcept {
   return mat_score;
 }
 
-chesspp::core::Score Evaluator::piece_square_score(
-    const chesspp::core::Board &board) const noexcept {
+chesspp::core::Score
+Evaluator::positional_score(const chesspp::core::Board &board,
+                            const core::Color side) const noexcept {
 
   core::Score position_score = 0;
-  core::Color us = board.side_to_move();
+  const core::Phase phase = board.curr_phase();
 
-  std::array<core::Bitboard, 5> board_by_piece{
-      board.pieces(us, core::PieceType::Pawn),
-      board.pieces(us, core::PieceType::Knight),
-      board.pieces(us, core::PieceType::Bishop),
-      board.pieces(us, core::PieceType::Rook),
-      board.pieces(us, core::PieceType::Queen)};
+  std::array<core::Bitboard, 6> board_by_piece{
+      board.pieces(side, core::PieceType::Pawn),
+      board.pieces(side, core::PieceType::Knight),
+      board.pieces(side, core::PieceType::Bishop),
+      board.pieces(side, core::PieceType::Rook),
+      board.pieces(side, core::PieceType::Queen),
+      board.pieces(side, core::PieceType::King)};
 
   for (size_t pieceInd = 0; pieceInd < board_by_piece.size(); pieceInd++) {
     while (board_by_piece[pieceInd]) {
       core::Square position = core::pop_lsb(board_by_piece[pieceInd]);
-      position_score += position_tables[pieceInd][position];
+      position_score += core::taper(position_tables[pieceInd][position], phase);
     }
   }
 
-  return us == core::Color::White ? position_score : (-1 * position_score);
+  return position_score;
+}
+
+[[nodiscard]] chesspp::core::Score
+Evaluator::advantages_score(const chesspp::core::Board &board,
+                            const core::Color side) const noexcept {
+  core::Score bonus = 0;
+  // Bishop pair:
+  core::Bitboard bishops = board.pieces(side, core::PieceType::Bishop);
+  if (core::pop_lsb(bishops)) {
+    bonus += core::taper(core::BISHOP_PAIR_WEIGHT, board.curr_phase());
+  }
+
+  return bonus;
 }
 
 } // namespace chesspp::engine

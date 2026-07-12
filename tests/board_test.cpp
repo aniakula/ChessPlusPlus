@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <bit>
 #include <cstdio>
 #include <iostream>
 #include <sstream>
@@ -96,6 +97,7 @@ void expect_positions_identical(const Board &actual, const Board &expected,
             expected.castling_rights().black_kingside);
   EXPECT_EQ(actual.castling_rights().black_queenside,
             expected.castling_rights().black_queenside);
+  EXPECT_EQ(actual.curr_phase(), expected.curr_phase());
 
   if (check_hash) {
     EXPECT_EQ(actual.zobrist_key(), expected.zobrist_key());
@@ -118,6 +120,7 @@ TEST(BoardTest, ClearLeavesEmptyBoard) {
   EXPECT_EQ(board.halfmove_clock(), 0U);
   EXPECT_EQ(board.fullmove_number(), 1U);
   EXPECT_EQ(board.zobrist_key(), 0U);
+  EXPECT_EQ(board.curr_phase(), 0);
 
   SCOPED_TRACE(log_board_to_string(board));
 }
@@ -251,6 +254,7 @@ TEST(BoardTest, LogBoardIncludesVisualBoardAndState) {
   EXPECT_NE(output.find("Board"), std::string::npos);
   EXPECT_NE(output.find("Position:"), std::string::npos);
   EXPECT_NE(output.find("Side to move:"), std::string::npos);
+  EXPECT_NE(output.find("Phase:"), std::string::npos);
   EXPECT_NE(output.find("Occupancy:"), std::string::npos);
   EXPECT_NE(output.find("Piece bitboards:"), std::string::npos);
   EXPECT_NE(output.find("P"), std::string::npos);
@@ -942,6 +946,202 @@ TEST(BoardTest, LongerTranspositionProducesIdenticalHash) {
   EXPECT_EQ(first.zobrist_key(), second.zobrist_key());
   expect_positions_identical(first, second);
   SCOPED_TRACE(log_board_to_string(first));
+}
+
+// ---------------------------------------------------------------------------
+// Phase tracking
+// ---------------------------------------------------------------------------
+
+Phase expected_phase_from_pieces(const Board &board) {
+  int phase = 0;
+  for (Color color : {Color::White, Color::Black}) {
+    phase += std::popcount(board.pieces(color, PieceType::Knight)) *
+             KNIGHTS_PHASE_WEIGHT;
+    phase += std::popcount(board.pieces(color, PieceType::Bishop)) *
+             BISHOPS_PHASE_WEIGHT;
+    phase += std::popcount(board.pieces(color, PieceType::Rook)) *
+             ROOKS_PHASE_WEIGHT;
+    phase += std::popcount(board.pieces(color, PieceType::Queen)) *
+             QUEENS_PHASE_WEIGHT;
+  }
+  return clamp_phase(phase);
+}
+
+TEST(BoardTest, FromFenComputesAccuratePhase) {
+  EXPECT_EQ(Board::starting_position().curr_phase(), OPENING_PHASE_WEIGHT);
+  EXPECT_EQ(board_from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").curr_phase(), 0);
+  EXPECT_EQ(board_from_fen("4k3/8/8/8/8/8/4R3/4K3 w - - 0 1").curr_phase(),
+            ROOKS_PHASE_WEIGHT);
+  EXPECT_EQ(board_from_fen("4k3/8/8/8/8/8/4N3/4K3 w - - 0 1").curr_phase(),
+            KNIGHTS_PHASE_WEIGHT);
+  EXPECT_EQ(board_from_fen("4k3/8/8/8/8/8/4B3/4K3 w - - 0 1").curr_phase(),
+            BISHOPS_PHASE_WEIGHT);
+  EXPECT_EQ(board_from_fen("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1").curr_phase(),
+            QUEENS_PHASE_WEIGHT);
+  EXPECT_EQ(board_from_fen("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1").curr_phase(), 0);
+
+  // Both sides' material contribute, capped at opening weight.
+  const Board midgame =
+      board_from_fen("r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w "
+                     "KQkq - 4 4");
+  EXPECT_EQ(midgame.curr_phase(), expected_phase_from_pieces(midgame));
+  EXPECT_LE(midgame.curr_phase(), OPENING_PHASE_WEIGHT);
+
+  // Extra queens beyond a normal set clamp to OPENING_PHASE_WEIGHT.
+  const Board overloaded =
+      board_from_fen("QQQQKQQQ/8/8/8/8/8/8/4k3 w - - 0 1");
+  EXPECT_EQ(overloaded.curr_phase(), OPENING_PHASE_WEIGHT);
+  SCOPED_TRACE(log_board_to_string(overloaded));
+}
+
+TEST(BoardTest, CaptureUpdatesPhaseForEveryPieceType) {
+  struct Case {
+    const char *start;
+    const char *result;
+    Square from;
+    Square to;
+    Phase expected_after;
+  };
+
+  const Case cases[] = {
+      // Capture pawn: phase unchanged.
+      {"4k3/8/8/3p4/4N3/8/8/4K3 w - - 0 1", "4k3/8/8/3N4/8/8/8/4K3 b - - 0 1",
+       square_from_algebraic('e', '4'), square_from_algebraic('d', '5'),
+       KNIGHTS_PHASE_WEIGHT},
+      // Capture knight.
+      {"4k3/8/8/3n4/4N3/8/8/4K3 w - - 0 1", "4k3/8/8/3N4/8/8/8/4K3 b - - 0 1",
+       square_from_algebraic('e', '4'), square_from_algebraic('d', '5'),
+       KNIGHTS_PHASE_WEIGHT},
+      // Capture bishop.
+      {"4k3/8/8/3b4/4N3/8/8/4K3 w - - 0 1", "4k3/8/8/3N4/8/8/8/4K3 b - - 0 1",
+       square_from_algebraic('e', '4'), square_from_algebraic('d', '5'),
+       KNIGHTS_PHASE_WEIGHT},
+      // Capture rook.
+      {"4k3/8/8/3r4/4N3/8/8/4K3 w - - 0 1", "4k3/8/8/3N4/8/8/8/4K3 b - - 0 1",
+       square_from_algebraic('e', '4'), square_from_algebraic('d', '5'),
+       KNIGHTS_PHASE_WEIGHT},
+      // Capture queen.
+      {"4k3/8/8/3q4/4N3/8/8/4K3 w - - 0 1", "4k3/8/8/3N4/8/8/8/4K3 b - - 0 1",
+       square_from_algebraic('e', '4'), square_from_algebraic('d', '5'),
+       KNIGHTS_PHASE_WEIGHT},
+  };
+
+  for (const Case &test_case : cases) {
+    Board board = board_from_fen(test_case.start);
+    const Phase phase_before = board.curr_phase();
+    const Board snapshot = board;
+
+    UndoState undo;
+    board.make_move(Move(test_case.from, test_case.to, PieceType::None,
+                         MoveFlag::Capture),
+                    undo);
+
+    EXPECT_EQ(board.curr_phase(), test_case.expected_after)
+        << log_board_to_string(board);
+    EXPECT_EQ(board.curr_phase(),
+              board_from_fen(test_case.result).curr_phase());
+    expect_positions_identical(board, board_from_fen(test_case.result));
+
+    board.unmake_move(undo);
+    EXPECT_EQ(board.curr_phase(), phase_before);
+    expect_positions_identical(board, snapshot);
+  }
+}
+
+TEST(BoardTest, PromotionUpdatesPhaseForEveryPieceType) {
+  struct Case {
+    PieceType promotion;
+    Phase expected_after;
+  };
+
+  const Case cases[] = {
+      {PieceType::Knight, KNIGHTS_PHASE_WEIGHT},
+      {PieceType::Bishop, BISHOPS_PHASE_WEIGHT},
+      {PieceType::Rook, ROOKS_PHASE_WEIGHT},
+      {PieceType::Queen, QUEENS_PHASE_WEIGHT},
+  };
+
+  for (const Case &test_case : cases) {
+    Board board = board_from_fen("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
+    EXPECT_EQ(board.curr_phase(), 0);
+    const Board snapshot = board;
+
+    UndoState undo;
+    board.make_move(Move(square_from_algebraic('a', '7'),
+                         square_from_algebraic('a', '8'), test_case.promotion,
+                         MoveFlag::Promotion),
+                    undo);
+
+    EXPECT_EQ(board.curr_phase(), test_case.expected_after)
+        << "promotion piece " << static_cast<int>(test_case.promotion);
+    EXPECT_EQ(board.curr_phase(), expected_phase_from_pieces(board));
+
+    board.unmake_move(undo);
+    EXPECT_EQ(board.curr_phase(), 0);
+    expect_positions_identical(board, snapshot);
+  }
+}
+
+TEST(BoardTest, PromotionCaptureUpdatesPhase) {
+  // Capture knight (-1) and promote to queen (+4): net +3 from kings-only.
+  Board board = board_from_fen("n3k3/1P6/8/8/8/8/8/4K3 w - - 0 1");
+  EXPECT_EQ(board.curr_phase(), KNIGHTS_PHASE_WEIGHT);
+  const Board snapshot = board;
+
+  UndoState undo;
+  board.make_move(Move(square_from_algebraic('b', '7'),
+                       square_from_algebraic('a', '8'), PieceType::Queen,
+                       MoveFlag::Promotion | MoveFlag::Capture),
+                  undo);
+
+  EXPECT_EQ(board.curr_phase(), QUEENS_PHASE_WEIGHT);
+  EXPECT_EQ(board.curr_phase(), expected_phase_from_pieces(board));
+
+  board.unmake_move(undo);
+  EXPECT_EQ(board.curr_phase(), KNIGHTS_PHASE_WEIGHT);
+  expect_positions_identical(board, snapshot);
+}
+
+TEST(BoardTest, PhaseClampedToOpeningWeightOnPromotion) {
+  Board board = Board::starting_position();
+  EXPECT_EQ(board.curr_phase(), OPENING_PHASE_WEIGHT);
+
+  // Clear a file and plant a promoting pawn; material still saturates phase.
+  board = board_from_fen(
+      "rnbqkbnr/Pppppppp/8/8/8/8/1PPPPPPP/RNBQKBNR w KQkq - 0 1");
+  EXPECT_EQ(board.curr_phase(), OPENING_PHASE_WEIGHT);
+
+  UndoState undo;
+  board.make_move(Move(square_from_algebraic('a', '7'),
+                       square_from_algebraic('a', '8'), PieceType::Queen,
+                       MoveFlag::Promotion),
+                  undo);
+
+  EXPECT_EQ(board.curr_phase(), OPENING_PHASE_WEIGHT);
+  board.unmake_move(undo);
+  EXPECT_EQ(board.curr_phase(), OPENING_PHASE_WEIGHT);
+}
+
+TEST(BoardTest, PhaseClampedAtZero) {
+  Board board = board_from_fen("4k3/8/8/8/8/8/4N3/4K3 w - - 0 1");
+  EXPECT_EQ(board.curr_phase(), KNIGHTS_PHASE_WEIGHT);
+
+  // Capture the only phase-contributing piece.
+  Board capture_board =
+      board_from_fen("4k3/8/8/8/8/8/3n4/3NK3 w - - 0 1");
+  EXPECT_EQ(capture_board.curr_phase(),
+            KNIGHTS_PHASE_WEIGHT + KNIGHTS_PHASE_WEIGHT);
+
+  UndoState undo;
+  capture_board.make_move(Move(square_from_algebraic('d', '1'),
+                               square_from_algebraic('d', '2'), PieceType::None,
+                               MoveFlag::Capture),
+                          undo);
+  EXPECT_EQ(capture_board.curr_phase(), KNIGHTS_PHASE_WEIGHT);
+
+  // Kings and pawns only stays at 0.
+  Board emptyish = board_from_fen("4k3/4p3/8/8/8/8/4P3/4K3 w - - 0 1");
+  EXPECT_EQ(emptyish.curr_phase(), 0);
 }
 
 } // namespace

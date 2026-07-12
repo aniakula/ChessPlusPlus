@@ -12,14 +12,14 @@ struct EvaluationConfig {
   bool use_king_safety{false};
 };
 
-// position based score bonuses:
-// pawn, knight, bishop, rook, queen (in that order)
-inline constexpr const std::array<std::array<core::Score, 64>, 5>
-    position_tables{};
+inline constexpr std::array<std::array<core::Weight, 64>, 6> position_tables{
+    core::PAWN_POSITION_SCORE,   core::KNIGHT_POSITION_SCORE,
+    core::BISHOP_POSITION_SCORE, core::ROOK_POSITION_SCORE,
+    core::QUEEN_POSITION_SCORE,  core::KING_POSITION_SCORE};
 
-// score per material piece
-// order: pawn=1, knight=3, bishop=4, rook=5, queen=9
-inline constexpr const std::array<core::Score, 6> material_table{1, 3, 4, 5, 9};
+inline constexpr std::array<core::Score, 6> material_table{
+    core::PAWN_SCORE, core::KNIGHT_SCORE, core::BISHOP_SCORE, core::ROOK_SCORE,
+    core::QUEEN_SCORE};
 
 class Evaluator {
 public:
@@ -31,10 +31,16 @@ public:
   evaluate(const chesspp::core::Board &board) const noexcept;
 
   [[nodiscard]] chesspp::core::Score
-  material_score(const chesspp::core::Board &board) const noexcept;
+  material_score(const chesspp::core::Board &board,
+                 const core::Color side) const noexcept;
 
   [[nodiscard]] chesspp::core::Score
-  piece_square_score(const chesspp::core::Board &board) const noexcept;
+  positional_score(const chesspp::core::Board &board,
+                   const core::Color side) const noexcept;
+
+  [[nodiscard]] chesspp::core::Score
+  advantages_score(const chesspp::core::Board &board,
+                   const core::Color side) const noexcept;
 
 private:
   EvaluationConfig config_{};

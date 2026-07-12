@@ -245,6 +245,7 @@ Board Board::from_fen(const char *fen) {
     file++;
   }
 
+  board.recompute_phase();
   return board;
 }
 
@@ -332,6 +333,8 @@ std::uint16_t Board::fullmove_number() const noexcept {
 }
 
 HashKey Board::zobrist_key() const noexcept { return zobrist_key_; }
+
+Phase Board::curr_phase() const noexcept { return curr_phase_; }
 
 std::optional<PieceType> Board::piece_on(Square square) const noexcept {
   for (size_t piece = 0; piece < PIECE_TYPE_COUNT; piece++) {
@@ -486,6 +489,7 @@ void Board::clear() noexcept {
   halfmove_clock_ = 0;
   fullmove_number_ = 1;
   zobrist_key_ = 0;
+  curr_phase_ = 0;
 }
 
 void Board::set_piece(Square square, Color color, PieceType piece) noexcept {
@@ -523,6 +527,7 @@ void Board::make_move(Move move, UndoState &undo) noexcept {
   undo.en_passant_square = en_passant_square_;
   undo.halfmove_clock = halfmove_clock_;
   undo.fullmove_number = fullmove_number_;
+  undo.phase = curr_phase_;
   undo.captured_piece = PieceType::None;
   undo.captured_square = NO_SQUARE;
 
@@ -538,12 +543,17 @@ void Board::make_move(Move move, UndoState &undo) noexcept {
     undo.captured_square = to;
     undo.captured_piece = piece_on(to).value_or(PieceType::None);
     remove_piece(to, them, undo.captured_piece);
+    update_phase(undo.captured_piece, true);
   }
 
   remove_piece(from, us, moving);
   const PieceType placed =
       has_flag(flags, MoveFlag::Promotion) ? move.promotion() : moving;
   set_piece(to, us, placed);
+
+  if (has_flag(flags, MoveFlag::Promotion)) {
+    update_phase(placed, false);
+  }
 
   if (has_flag(flags, MoveFlag::KingCastle)) {
     remove_piece(to + 1, us, PieceType::Rook);
@@ -602,6 +612,7 @@ void Board::unmake_move(const UndoState &undo) noexcept {
   const PieceType placed = has_flag(flags, MoveFlag::Promotion)
                                ? move.promotion()
                                : undo.moved_piece;
+
   // set moved piece to original location:
   remove_piece(to, us, placed);
   set_piece(from, us, undo.moved_piece);
@@ -617,6 +628,32 @@ void Board::unmake_move(const UndoState &undo) noexcept {
   halfmove_clock_ = undo.halfmove_clock;
   fullmove_number_ = undo.fullmove_number;
   zobrist_key_ = undo.zobrist_key;
+  curr_phase_ = clamp_phase(undo.phase);
+}
+
+void Board::update_phase(PieceType piece, bool removing) noexcept {
+  const int weight = static_cast<int>(phase_weight(piece));
+  if (weight == 0) {
+    return;
+  }
+
+  const int delta = removing ? -weight : weight;
+  curr_phase_ = clamp_phase(static_cast<int>(curr_phase_) + delta);
+}
+
+void Board::recompute_phase() noexcept {
+  int phase = 0;
+  for (std::size_t color = 0; color < COLOR_COUNT; ++color) {
+    phase += std::popcount(pieces_[color][piece_index(PieceType::Knight)]) *
+             KNIGHTS_PHASE_WEIGHT;
+    phase += std::popcount(pieces_[color][piece_index(PieceType::Bishop)]) *
+             BISHOPS_PHASE_WEIGHT;
+    phase += std::popcount(pieces_[color][piece_index(PieceType::Rook)]) *
+             ROOKS_PHASE_WEIGHT;
+    phase += std::popcount(pieces_[color][piece_index(PieceType::Queen)]) *
+             QUEENS_PHASE_WEIGHT;
+  }
+  curr_phase_ = clamp_phase(phase);
 }
 
 void Board::recompute_derived_state() noexcept {
@@ -652,6 +689,8 @@ void Board::recompute_derived_state() noexcept {
   if (side_to_move_ == Color::Black) {
     zobrist_key_ ^= keys.side_to_move;
   }
+
+  recompute_phase();
 }
 
 // verbose flag for extra debug information
@@ -692,6 +731,8 @@ void log_board(const Board &board, std::ostream &out, bool verbose) {
     out << '\n';
     out << "  Halfmove clock: " << board.halfmove_clock() << '\n';
     out << "  Fullmove number: " << board.fullmove_number() << '\n';
+    out << "  Phase: " << static_cast<int>(board.curr_phase()) << '/'
+        << static_cast<int>(OPENING_PHASE_WEIGHT) << '\n';
     out << "  Zobrist key: ";
     write_bitboard(out, board.zobrist_key());
     out << '\n';

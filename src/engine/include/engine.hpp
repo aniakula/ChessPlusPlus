@@ -2,7 +2,6 @@
 
 #include "board.hpp"
 #include "search.hpp"
-#include "types.hpp"
 
 #include <cstddef>
 #include <cstdint>

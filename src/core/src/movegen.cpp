@@ -9,12 +9,6 @@ namespace chesspp::core {
 
 namespace {
 
-[[nodiscard]] Square pop_lsb(Bitboard &bitboard) noexcept {
-  const Square square = static_cast<Square>(std::countr_zero(bitboard));
-  bitboard &= bitboard - 1;
-  return square;
-}
-
 inline void push_move(MoveList &moves, Square from, Square to,
                       MoveFlag flags = MoveFlag::Quiet) noexcept {
   moves.push(Move(from, to, PieceType::None, flags));

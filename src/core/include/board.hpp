@@ -28,6 +28,7 @@ struct UndoState {
   std::uint16_t halfmove_clock{0};
   std::uint16_t fullmove_number{1};
   HashKey zobrist_key{0};
+  Phase phase{OPENING_PHASE_WEIGHT};
 };
 
 class Board {
@@ -49,6 +50,7 @@ public:
   [[nodiscard]] std::uint16_t halfmove_clock() const noexcept;
   [[nodiscard]] std::uint16_t fullmove_number() const noexcept;
   [[nodiscard]] HashKey zobrist_key() const noexcept;
+  [[nodiscard]] Phase curr_phase() const noexcept;
 
   void set_side_to_move(Color color);
   void set_castling_rights(Color color, PieceType side, bool set);
@@ -81,11 +83,12 @@ public:
   void remove_piece(Square square, Color color, PieceType piece) noexcept;
   void make_move(Move move, UndoState &undo) noexcept;
   void unmake_move(const UndoState &undo) noexcept;
-
   // Used for loading FEN/tests/debugging
   void recompute_derived_state() noexcept;
+  void recompute_phase() noexcept;
 
 private:
+  void update_phase(PieceType piece, bool removing) noexcept;
   PieceBitboards pieces_{};
   std::array<Bitboard, COLOR_COUNT> occupancy_by_color_{};
   Bitboard all_occupancy_{0};
@@ -95,6 +98,7 @@ private:
   std::uint16_t halfmove_clock_{0};
   std::uint16_t fullmove_number_{1};
   HashKey zobrist_key_{0};
+  Phase curr_phase_{OPENING_PHASE_WEIGHT};
 };
 
 // verbose flag for extra debug information
