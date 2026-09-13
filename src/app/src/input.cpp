@@ -24,28 +24,52 @@ InputHandler::transform_event(const sf::Event &event,
       return {};
     }
 
-    selected_square_ = clicked;
     InputAction action{};
     action.square = clicked;
+
+    // A destination may have multiple promotion moves (Q/R/B/N). The old loop
+    // overwrote action.move on every match, so Knight (pushed last) always won.
+    chesspp::core::MoveList matches;
     for (const core::Move &move : legal_moves_) {
       if (move.to() == clicked) {
-        action.type = InputAction::Type::PlayMove;
-        action.move = move;
+        matches.push(move);
       }
     }
 
-    legal_moves_.clear();
-    if (action.type == InputAction::Type::None) {
-      action.type = InputAction::Type::SelectSquare;
-      const auto piece = game.board().piece_and_color_on(clicked);
-      if (piece.has_value() && piece->first == human_color &&
-          game.board().side_to_move() == human_color &&
-          piece->second != core::PieceType::None) {
-        chesspp::core::Board board_copy = game.board();
-        chesspp::core::Square from = clicked;
-        core::MoveGenerator::generate_legal(board_copy, legal_moves_, from);
-        action.legal_moves = legal_moves_;
+    if (!matches.empty()) {
+      bool promotion = false;
+      for (const core::Move &move : matches) {
+        if (core::has_flag(move.flags(), core::MoveFlag::Promotion)) {
+          promotion = true;
+          break;
+        }
       }
+
+      if (promotion) {
+        action.type = InputAction::Type::RequestPromotion;
+        action.legal_moves = matches;
+        // Keep the already-selected from-square so move highlights stay visible.
+        return action;
+      }
+
+      action.type = InputAction::Type::PlayMove;
+      action.move = matches[0];
+      legal_moves_.clear();
+      selected_square_ = clicked;
+      return action;
+    }
+
+    selected_square_ = clicked;
+    legal_moves_.clear();
+    action.type = InputAction::Type::SelectSquare;
+    const auto piece = game.board().piece_and_color_on(clicked);
+    if (piece.has_value() && piece->first == human_color &&
+        game.board().side_to_move() == human_color &&
+        piece->second != core::PieceType::None) {
+      chesspp::core::Board board_copy = game.board();
+      chesspp::core::Square from = clicked;
+      core::MoveGenerator::generate_legal(board_copy, legal_moves_, from);
+      action.legal_moves = legal_moves_;
     }
 
     return action;

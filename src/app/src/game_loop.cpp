@@ -33,17 +33,33 @@ void GameLoop::run() {
         window_.close();
         break;
       }
+
+      if (const auto *mouse_press =
+              event->getIf<sf::Event::MouseButtonPressed>()) {
+        if (mouse_press->button == sf::Mouse::Button::Left &&
+            pending_promotions_.has_value() &&
+            handle_promotion_click(mouse_press->position)) {
+          continue;
+        }
+      }
+
+      // Ignore board input while a promotion choice is outstanding.
+      if (pending_promotions_.has_value()) {
+        continue;
+      }
+
       const InputAction action =
           input_.transform_event(*event, game_, human_color_);
       handle_action(action);
     }
 
-    if (!game_over() && !is_human_turn()) {
+    draw_frame();
+
+    if (!game_over() && !is_human_turn() && !pending_promotions_.has_value()) {
       play_engine_turn();
     }
 
-    renderer_.draw(game_, input_.selected_square(), input_.legal_moves(),
-                   human_color_);
+    draw_frame();
   }
 }
 
@@ -52,22 +68,61 @@ void GameLoop::handle_action(const InputAction &action) {
   case InputAction::Type::None:
     break;
   case InputAction::Type::SelectSquare:
+    break;
   case InputAction::Type::RequestPromotion:
+    pending_promotions_ = action.legal_moves;
     break;
   case InputAction::Type::Quit:
     window_.close();
     break;
   case InputAction::Type::PlayMove:
     if (game_.try_make_move(action.move)) {
+      clear_pending_promotion();
       input_.clear_selection();
     }
     break;
   }
 }
 
+bool GameLoop::handle_promotion_click(sf::Vector2i pixel) {
+  if (!pending_promotions_.has_value()) {
+    return false;
+  }
+
+  const auto choice = renderer_.promotion_choice_at(pixel);
+  if (!choice.has_value()) {
+    // Click outside the chooser cancels promotion and clears selection.
+    clear_pending_promotion();
+    input_.clear_selection();
+    return true;
+  }
+
+  for (const chesspp::core::Move move : *pending_promotions_) {
+    if (move.promotion() == *choice) {
+      if (game_.try_make_move(move)) {
+        clear_pending_promotion();
+        input_.clear_selection();
+      }
+      return true;
+    }
+  }
+
+  return true;
+}
+
+void GameLoop::clear_pending_promotion() noexcept {
+  pending_promotions_.reset();
+}
+
+void GameLoop::draw_frame() {
+  renderer_.draw(game_, input_.selected_square(), input_.legal_moves(),
+                 human_color_, pending_promotions_.has_value());
+}
+
 void GameLoop::play_engine_turn() {
   engine_.set_position(game_.board());
-  const chesspp::engine::SearchResult &result = engine_.think();
+  engine::SearchLimits limits;
+  const chesspp::engine::SearchResult &result = engine_.think(limits);
 
   LABELED_DEBUG_LOG("Best Move: ", result.best_move);
   LABELED_DEBUG_LOG("Score: ", result.score);

@@ -20,7 +20,7 @@ public:
   void set_transposition_table_size(std::size_t megabytes);
   void clear_cache() noexcept;
 
-  [[nodiscard]] SearchResult think();
+  [[nodiscard]] SearchResult random();
   [[nodiscard]] SearchResult think(const SearchLimits &limits);
 
 private:

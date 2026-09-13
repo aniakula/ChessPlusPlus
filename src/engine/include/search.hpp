@@ -5,6 +5,7 @@
 #include "movegen.hpp"
 #include "types.hpp"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <ostream>
@@ -65,7 +66,7 @@ private:
 struct SearchLimits {
   int max_depth{5};
   std::uint64_t max_nodes{0};
-  std::uint64_t max_time_ms{0};
+  std::uint64_t max_time_ms{1000};
 };
 
 struct SearchStats {
@@ -116,6 +117,9 @@ private:
   TranspositionTable transposition_table_{};
   MoveOrderer move_orderer_{};
   SearchStats stats_{};
+  std::chrono::steady_clock::time_point search_start_{};
+  SearchLimits active_limits_{};
+  bool stopped_{false};
 
   [[nodiscard]] chesspp::core::Score
   alpha_beta(chesspp::core::Board &board, int depth, chesspp::core::Score alpha,

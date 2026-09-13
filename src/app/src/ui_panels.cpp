@@ -4,6 +4,7 @@
 
 #include <SFML/Graphics.hpp>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 
@@ -14,11 +15,15 @@ namespace {
 constexpr float PANEL_PADDING = 14.0F;
 constexpr float SECTION_GAP = 12.0F;
 constexpr float EVAL_SECTION_HEIGHT = 108.0F;
-constexpr float DIALOGS_TOP = 436.0F;
-constexpr float DIALOGS_HEIGHT = 140.0F;
+constexpr float PROMOTION_TOP = 360.0F;
+constexpr float PROMOTION_HEIGHT = 120.0F;
 
 // ±4 pawns saturates the bar; soft curve keeps small edges readable.
 constexpr float EVAL_BAR_SCALE_CP = 400.0F;
+
+constexpr std::array<chesspp::core::PieceType, 4> PROMOTION_CHOICES{
+    chesspp::core::PieceType::Queen, chesspp::core::PieceType::Rook,
+    chesspp::core::PieceType::Bishop, chesspp::core::PieceType::Knight};
 
 [[nodiscard]] const char *color_name(chesspp::core::Color color) {
   return color == chesspp::core::Color::White ? "White" : "Black";
@@ -49,12 +54,54 @@ game_result_message(const chesspp::core::Game &game,
   return std::clamp(0.5F + 0.5F * curved, 0.02F, 0.98F);
 }
 
+[[nodiscard]] char promotion_letter(chesspp::core::PieceType piece) {
+  switch (piece) {
+  case chesspp::core::PieceType::Queen:
+    return 'Q';
+  case chesspp::core::PieceType::Rook:
+    return 'R';
+  case chesspp::core::PieceType::Bishop:
+    return 'B';
+  case chesspp::core::PieceType::Knight:
+    return 'N';
+  default:
+    return '?';
+  }
+}
+
+[[nodiscard]] sf::FloatRect
+promotion_button_bounds(const sf::FloatRect &region, std::size_t index) {
+  constexpr float button_gap = 8.0F;
+  constexpr float button_height = 44.0F;
+  const float content_width = region.size.x - 20.0F;
+  const float button_width =
+      (content_width - button_gap * 3.0F) / static_cast<float>(PROMOTION_CHOICES.size());
+  const float x =
+      region.position.x + 10.0F +
+      static_cast<float>(index) * (button_width + button_gap);
+  const float y = region.position.y + 52.0F;
+  return {{x, y}, {button_width, button_height}};
+}
+
 } // namespace
 
-sf::FloatRect UiPanels::popup_region() const noexcept {
-  return {{PANEL_PADDING, DIALOGS_TOP},
+sf::FloatRect UiPanels::promotion_region() const noexcept {
+  return {{PANEL_PADDING, PROMOTION_TOP},
           {static_cast<float>(ui_layout::PANEL_WIDTH) - PANEL_PADDING * 2.0F,
-           DIALOGS_HEIGHT}};
+           PROMOTION_HEIGHT}};
+}
+
+std::optional<chesspp::core::PieceType>
+UiPanels::promotion_choice_at(sf::Vector2i pixel) const noexcept {
+  const sf::Vector2f point{static_cast<float>(pixel.x),
+                           static_cast<float>(pixel.y)};
+  const sf::FloatRect region = promotion_region();
+  for (std::size_t index = 0; index < PROMOTION_CHOICES.size(); ++index) {
+    if (promotion_button_bounds(region, index).contains(point)) {
+      return PROMOTION_CHOICES[index];
+    }
+  }
+  return std::nullopt;
 }
 
 void UiPanels::draw_panel_background(sf::RenderWindow &window,
@@ -86,27 +133,6 @@ void UiPanels::draw_section_box(sf::RenderWindow &window, const sf::Font &font,
   body_text.setFillColor(sf::Color(150, 158, 170));
   body_text.setPosition({bounds.position.x + 10.0F, bounds.position.y + 32.0F});
   window.draw(body_text);
-}
-
-void UiPanels::draw_stub_button(sf::RenderWindow &window, const sf::Font &font,
-                                const sf::FloatRect &bounds,
-                                const char *label) const {
-  sf::RectangleShape button{bounds.size};
-  button.setPosition(bounds.position);
-  button.setFillColor(sf::Color(52, 58, 70));
-  button.setOutlineColor(sf::Color(88, 96, 112));
-  button.setOutlineThickness(1.0F);
-  window.draw(button);
-
-  sf::Text label_text{font, label, 13U};
-  label_text.setFillColor(sf::Color(170, 176, 188));
-  const sf::FloatRect text_bounds = label_text.getLocalBounds();
-  label_text.setPosition(
-      {bounds.position.x + (bounds.size.x - text_bounds.size.x) / 2.0F -
-           text_bounds.position.x,
-       bounds.position.y + (bounds.size.y - text_bounds.size.y) / 2.0F -
-           text_bounds.position.y});
-  window.draw(label_text);
 }
 
 void UiPanels::draw_eval_bar(sf::RenderWindow &window, const sf::Font &font,
@@ -172,17 +198,59 @@ void UiPanels::draw_eval_bar(sf::RenderWindow &window, const sf::Font &font,
   white_fill.setFillColor(sf::Color(240, 217, 181));
   window.draw(white_fill);
 
-  // Center tick at equal evaluation.
   sf::RectangleShape center_tick{{2.0F, bar_height}};
   center_tick.setPosition({bar_x + bar_width * 0.5F - 1.0F, bar_y});
   center_tick.setFillColor(sf::Color(120, 128, 140, 180));
   window.draw(center_tick);
 }
 
+void UiPanels::draw_promotion_chooser(sf::RenderWindow &window,
+                                      const sf::Font &font,
+                                      const sf::FloatRect &bounds) const {
+  sf::RectangleShape frame{bounds.size};
+  frame.setPosition(bounds.position);
+  frame.setFillColor(sf::Color(28, 31, 38));
+  frame.setOutlineColor(sf::Color(120, 160, 210));
+  frame.setOutlineThickness(1.0F);
+  window.draw(frame);
+
+  sf::Text title_text{font, "Promote to", 16U};
+  title_text.setFillColor(sf::Color(210, 214, 222));
+  title_text.setPosition({bounds.position.x + 10.0F, bounds.position.y + 8.0F});
+  window.draw(title_text);
+
+  sf::Text hint_text{font, "Choose a piece", 12U};
+  hint_text.setFillColor(sf::Color(150, 158, 170));
+  hint_text.setPosition({bounds.position.x + 10.0F, bounds.position.y + 30.0F});
+  window.draw(hint_text);
+
+  for (std::size_t index = 0; index < PROMOTION_CHOICES.size(); ++index) {
+    const sf::FloatRect button = promotion_button_bounds(bounds, index);
+    sf::RectangleShape shape{button.size};
+    shape.setPosition(button.position);
+    shape.setFillColor(sf::Color(52, 58, 70));
+    shape.setOutlineColor(sf::Color(88, 96, 112));
+    shape.setOutlineThickness(1.0F);
+    window.draw(shape);
+
+    const char label[2] = {promotion_letter(PROMOTION_CHOICES[index]), '\0'};
+    sf::Text label_text{font, label, 20U};
+    label_text.setFillColor(sf::Color(235, 238, 245));
+    const sf::FloatRect text_bounds = label_text.getLocalBounds();
+    label_text.setPosition(
+        {button.position.x + (button.size.x - text_bounds.size.x) / 2.0F -
+             text_bounds.position.x,
+         button.position.y + (button.size.y - text_bounds.size.y) / 2.0F -
+             text_bounds.position.y});
+    window.draw(label_text);
+  }
+}
+
 void UiPanels::draw_left(sf::RenderWindow &window, const sf::Font &font,
                          const chesspp::core::Game &game,
                          const chesspp::core::Color human_color,
-                         chesspp::core::Score evaluation) const {
+                         chesspp::core::Score evaluation,
+                         bool awaiting_promotion) const {
   draw_panel_background(window, ui_layout::left_panel_region(),
                         sf::Color(48, 52, 60));
 
@@ -199,10 +267,6 @@ void UiPanels::draw_left(sf::RenderWindow &window, const sf::Font &font,
     snprintf(turn_buffer, sizeof(turn_buffer), "Game over");
   }
 
-  char player_buffer[64];
-  snprintf(player_buffer, sizeof(player_buffer), "You play as %s",
-           color_name(human_color));
-
   float y = 56.0F;
   const float width =
       static_cast<float>(ui_layout::PANEL_WIDTH) - PANEL_PADDING * 2.0F;
@@ -212,7 +276,9 @@ void UiPanels::draw_left(sf::RenderWindow &window, const sf::Font &font,
   y += 72.0F + SECTION_GAP;
 
   char status_buffer[96];
-  if (game.is_checkmate()) {
+  if (awaiting_promotion) {
+    snprintf(status_buffer, sizeof(status_buffer), "Choose promotion.");
+  } else if (game.is_checkmate()) {
     snprintf(status_buffer, sizeof(status_buffer), "Checkmate.");
   } else if (game.is_stalemate()) {
     snprintf(status_buffer, sizeof(status_buffer), "Stalemate.");
@@ -232,73 +298,17 @@ void UiPanels::draw_left(sf::RenderWindow &window, const sf::Font &font,
 
   draw_eval_bar(window, font, {{PANEL_PADDING, y}, {width, EVAL_SECTION_HEIGHT}},
                 evaluation);
-  y += EVAL_SECTION_HEIGHT + SECTION_GAP;
 
-  draw_section_box(window, font, {{PANEL_PADDING, y}, {width, 64.0F}}, "Player",
-                   player_buffer);
-
-  const sf::FloatRect popup = popup_region();
-  draw_section_box(window, font, popup, "Dialogs", "");
-  y = popup.position.y + popup.size.y + SECTION_GAP;
-
-  draw_section_box(window, font, {{PANEL_PADDING, y}, {width, 72.0F}},
-                   "Options", "Game controls (coming soon).");
-  y += 72.0F + SECTION_GAP;
-
-  const float button_height = 30.0F;
-  draw_stub_button(window, font, {{PANEL_PADDING, y}, {width, button_height}},
-                   "New Game");
-  draw_stub_button(
-      window, font,
-      {{PANEL_PADDING, y + button_height + 8.0F}, {width, button_height}},
-      "Resign");
+  if (awaiting_promotion) {
+    draw_promotion_chooser(window, font, promotion_region());
+  }
 }
 
 void UiPanels::draw_right(sf::RenderWindow &window,
                           const sf::Font &font) const {
+  (void)font;
   draw_panel_background(window, ui_layout::right_panel_region(),
                         sf::Color(32, 36, 42));
-
-  sf::Text heading{font, "Engine Log", 20U};
-  heading.setFillColor(sf::Color(220, 224, 232));
-  heading.setPosition({ui_layout::BOARD_ORIGIN_X +
-                           static_cast<float>(ui_layout::BOARD_SIZE) +
-                           PANEL_PADDING,
-                       PANEL_PADDING});
-  window.draw(heading);
-
-  const float panel_x =
-      ui_layout::BOARD_ORIGIN_X + static_cast<float>(ui_layout::BOARD_SIZE);
-  const sf::FloatRect terminal_bounds{
-      {panel_x + PANEL_PADDING, 52.0F},
-      {static_cast<float>(ui_layout::PANEL_WIDTH) - PANEL_PADDING * 2.0F,
-       static_cast<float>(ui_layout::WINDOW_HEIGHT) - 66.0F}};
-
-  sf::RectangleShape terminal{terminal_bounds.size};
-  terminal.setPosition(terminal_bounds.position);
-  terminal.setFillColor(sf::Color(18, 20, 24));
-  terminal.setOutlineColor(sf::Color(58, 64, 76));
-  terminal.setOutlineThickness(1.0F);
-  window.draw(terminal);
-
-  const char *placeholder_lines[] = {
-      "> engine ready",
-      "> waiting for search output...",
-      "> best move: (pending)",
-      "> depth: --",
-      "> nodes: --",
-      "",
-      "Events and diagnostics will stream here.",
-  };
-
-  float line_y = terminal_bounds.position.y + 10.0F;
-  for (const char *line : placeholder_lines) {
-    sf::Text line_text{font, line, 12U};
-    line_text.setFillColor(sf::Color(118, 196, 141));
-    line_text.setPosition({terminal_bounds.position.x + 10.0F, line_y});
-    window.draw(line_text);
-    line_y += 18.0F;
-  }
 }
 
 } // namespace chesspp::app

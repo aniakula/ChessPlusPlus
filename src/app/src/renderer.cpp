@@ -67,18 +67,20 @@ bool Renderer::load_assets(const char *asset_root) {
 }
 
 void Renderer::draw(const chesspp::core::Game &game) {
-  draw(game, std::nullopt, {}, chesspp::core::Color::White);
+  draw(game, std::nullopt, {}, chesspp::core::Color::White, false);
 }
 
 void Renderer::draw(const chesspp::core::Game &game,
                     std::optional<chesspp::core::Square> selected_square,
                     const chesspp::core::MoveList &legal_moves,
-                    const chesspp::core::Color human_color) {
+                    const chesspp::core::Color human_color,
+                    const bool awaiting_promotion) {
   window_.clear(sf::Color(24, 26, 30));
 
   if (font_.has_value()) {
     const chesspp::core::Score evaluation = evaluator_.evaluate(game.board());
-    panels_.draw_left(window_, *font_, game, human_color, evaluation);
+    panels_.draw_left(window_, *font_, game, human_color, evaluation,
+                      awaiting_promotion);
     panels_.draw_right(window_, *font_);
   }
 
@@ -183,8 +185,9 @@ void Renderer::draw_move_highlights(
 
 void Renderer::draw_status(const chesspp::core::Game &game) { (void)game; }
 
-sf::FloatRect Renderer::popup_region() const noexcept {
-  return panels_.popup_region();
+std::optional<chesspp::core::PieceType>
+Renderer::promotion_choice_at(sf::Vector2i pixel) const noexcept {
+  return panels_.promotion_choice_at(pixel);
 }
 
 chesspp::core::Square Renderer::pixel_to_square(sf::Vector2i pixel) const {
